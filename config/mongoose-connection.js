@@ -1,12 +1,14 @@
 const mongoose = require('mongoose');
+const config = require("config");
+const dbgr = require('debug')('development:mongoose');
 
 mongoose
-.connect('mongodb://127.0.0.1:27017/Carryva')
-.then(() => {
-    console.log('Connected to MongoDB');
-})
-.catch((err) => {
-    console.error('Error connecting to MongoDB:', err);
-});
+    .connect(`${config.get("MONG_URI")}/carryva`)
+    .then(() => {
+        dbgr('Connected to MongoDB');
+    })
+    .catch((err) => {
+        dbgr('Error connecting to MongoDB:', err);
+    });
 
 module.exports = mongoose.connection;
