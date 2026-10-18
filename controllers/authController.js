@@ -1,7 +1,8 @@
 const userModel = require('../models/user-model');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const {generateToken} = require("../utils/generateToken")
+const {generateToken} = require("../utils/generateToken");
+const { generateKeySync } = require('node:crypto');
 
 
 module.exports.registerUser = async(req, res) => {
@@ -38,6 +39,12 @@ module.exports.loginUser = async function(req, res) {
     if(!user) return res.sennd("Email or password is wrong")
 
         bcrypt.compare(password, user.password, function(err, result){
-            res.send(result)
+            if(result){
+                let token = generateToken(user)
+                res.cookie("token", token)
+                res.send("you can login")
+            }
+            else return res.sennd("Email or password is wrong")
         })
 }
+
