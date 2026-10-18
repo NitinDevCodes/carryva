@@ -6,6 +6,8 @@ const indexRouter = require('./routes/index');
 const ownersRouter = require('./routes/ownersRouter');
 const usersRouter = require('./routes/usersRouter');
 const productsRouter = require('./routes/productsRouter');
+const expressSession = require("connect-flash")
+const flash = require("connect-flash")
 
 require('dotenv').config();
 
