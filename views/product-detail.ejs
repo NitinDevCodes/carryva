@@ -1,0 +1,25 @@
+<%- include('./partials/header') %>
+<main class="min-h-screen px-6 py-20 md:px-20">
+    <div class="mx-auto max-w-5xl">
+        <a class="mb-6 inline-block underline" href="/shop">Back to products</a>
+        <% if (error) { %>
+            <p class="rounded bg-zinc-100 p-6 text-zinc-700"><%= error %></p>
+        <% } else { %>
+            <article class="grid overflow-hidden rounded-md border md:grid-cols-2">
+                <div class="flex min-h-80 items-center justify-center p-8" style="background-color: <%= product.bgColor %>">
+                    <img class="max-h-96 max-w-full object-contain" src="data:<%= product.imageContentType %>;base64,<%= product.image.toString('base64') %>" alt="<%= product.name %>">
+                </div>
+                <div class="flex flex-col justify-center gap-4 p-8" style="background-color: <%= product.panelColor %>; color: <%= product.textColor %>">
+                    <% if (product.isNewCollection) { %><span class="w-fit rounded bg-white px-2 py-1 text-xs text-black">New collection</span><% } %>
+                    <h1 class="text-3xl font-semibold"><%= product.name %></h1>
+                    <% if (product.discount > 0) { %>
+                        <p><del>₹ <%= product.price.toFixed(2) %></del> <strong>₹ <%= (product.price * (1 - product.discount / 100)).toFixed(2) %></strong> <span>(<%= product.discount %>% off)</span></p>
+                    <% } else { %>
+                        <p class="text-xl">₹ <%= product.price.toFixed(2) %></p>
+                    <% } %>
+                </div>
+            </article>
+        <% } %>
+    </div>
+</main>
+<%- include('./partials/footer') %>

@@ -15,13 +15,13 @@
                         <form autocomplete="off" action="/users/register" method="post">
                             <input
                                 class="bg-zinc-100 block w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                                type="text" placeholder="Full Name" name="fullname">
+                                type="text" placeholder="Full Name" name="fullName" minlength="3" maxlength="80" required autocomplete="name">
                             <input
                                 class="bg-zinc-100 block w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                                type="email" placeholder="Email" name="email">
+                                type="email" placeholder="Email" name="email" maxlength="254" required autocomplete="email">
                             <input
                                 class="bg-zinc-100 block w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                                type="password" placeholder="Password" name="password">
+                                type="password" placeholder="Password" name="password" minlength="8" maxlength="72" required autocomplete="new-password">
                             <input class="px-5 rounded-full py-3 mt-2 bg-blue-500 text-white" type="submit"
                                 value="Create My Account">
                         </form>
@@ -33,10 +33,10 @@
                         <form autocomplete="off" action="/users/login" method="post">
                             <input
                                 class="block bg-zinc-100 w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                                type="email" placeholder="Email" name="email">
+                                type="email" placeholder="Email" name="email" maxlength="254" required autocomplete="username">
                             <input
                                 class="block bg-zinc-100 w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                                type="password" placeholder="Password" name="password">
+                                type="password" placeholder="Password" name="password" required autocomplete="current-password">
                             <input class="px-5 block rounded-full py-3 mt-2 bg-blue-500 text-white" type="submit"
                                 value="Login">
                         </form>

@@ -1,3 +1,5 @@
+require('dotenv').config({ override: process.env.NODE_ENV !== 'production' });
+
 const express = require('express');
 const app = express();
 const cookieParser = require('cookie-parser');
@@ -6,10 +8,9 @@ const indexRouter = require('./routes/index');
 const ownersRouter = require('./routes/ownersRouter');
 const usersRouter = require('./routes/usersRouter');
 const productsRouter = require('./routes/productsRouter');
-const expressSession = require("connect-flash")
-const flash = require("connect-flash")
-
-require('dotenv').config();
+const session = require('express-session');
+const flash = require('connect-flash');
+const { SESSION_SECRET } = require('./config/keys');
 
 const db = require('./config/mongoose-connection');
 
@@ -17,16 +18,22 @@ const db = require('./config/mongoose-connection');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(
-    expressSession({
-        resave: false,
-        saveUninitialized: false,
-        secrete: process.env.EXPRESS_SESSION_SECRETE,
-    })
-)
-app.use(flash())
+app.use(session({
+    name: 'carryva.sid',
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000,
+    },
+}));
+app.use(flash());
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
 // Routes
 app.use('/', indexRouter);
@@ -34,4 +41,9 @@ app.use('/owners', ownersRouter);
 app.use('/users', usersRouter);
 app.use('/products', productsRouter);
 
-app.listen(3000);
+const port = Number(process.env.PORT) || 3000;
+if (require.main === module) {
+    app.listen(port, () => console.log(`Carryva listening on http://localhost:${port}`));
+}
+
+module.exports = app;

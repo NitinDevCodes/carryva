@@ -3,11 +3,11 @@
         <div class="w-1/2 flex items-center justify-center h-screen">
             <div class="w-full px-32">
                 <h4 class="text-2xl capitalize mb-5">Admin Access</h4>
-                <form action="/create" method="post">
+                <form action="/users/login" method="post">
                     <input class="block bg-zinc-100 w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                        type="email" placeholder="Email" name="email">
+                        type="email" placeholder="Email" name="email" required autocomplete="username">
                     <input class="block bg-zinc-100 w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                        type="password" placeholder="Password" name="password">
+                        type="password" placeholder="Password" name="password" required autocomplete="current-password">
                     <input class="px-5 rounded-full py-3 mt-2 bg-blue-500 text-white" type="submit" value="Login">
                 </form>
             </div>

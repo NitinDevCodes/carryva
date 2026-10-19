@@ -1,50 +1,51 @@
 <%- include('./partials/header') %>
-    <div class="w-full h-screen flex items-start px-20 py-20">
-        <div class="w-[25%] flex h-screen flex-col items-start">
-            <div class="flex items-center gap-2">
-                <h3>sort by</h3>
-                <form action="/shop">
-                    <select class="border-[1px] px-2 py-1" name="sortby" id="">
-                        <option value="popular">Popular</option>
-                        <option value="newest">Newest</option>
-                    </select>
-                </form>
-            </div>
-            <div class="flex flex-col mt-20">
-                <a class="block w-fit mb-2" href="">New Collection</a>
-                <a class="block w-fit mb-2" href="">All Products</a>
-                <a class="block w-fit mb-2" href="">Discounted Products</a>
-            </div>
-            <div class="mt-32">
-                <a class="block w-fit mb-2" href="">Filter by :</a>
-                <a class="block w-fit mb-2" href="">Availability</a>
-                <a class="block w-fit mb-2" href="">Discount</a>
-            </div>
-        </div>
-        <div class="w-[75%] flex flex-col gap-5 h-screen">
-            <div class="flex items-start gap-5">
-                <% products.forEach(function(product){ %>
-                    <div class="w-60">
-                        <div class="w-full h-52 flex items-center justify-center bg-[<%= product.bgcolor %>]">
-                            <img class="h-[12rem]" src="data:image/jpeg;base64,<%= product.image.toString('base64') %>"
-                                alt="">
-                        </div>
-                        <div
-                            class="flex justify-between bg-[<%= product.panelcolor %>] items-center px-4 py-4 text-[<%= product.textcolor %>]">
-                            <div>
-                                <h3>
-                                    <%= product.name %>
-                                </h3>
-                                <h4>₹ <%= product.price %>
-                                </h4>
+<main class="min-h-screen w-full px-6 py-20 md:px-20">
+    <div class="mx-auto flex max-w-7xl flex-col gap-8 md:flex-row">
+        <aside class="w-full shrink-0 md:w-1/4">
+            <form action="/shop" method="get" class="mb-8">
+                <% if (filter !== 'all') { %><input type="hidden" name="filter" value="<%= filter %>"><% } %>
+                <label for="sortby" class="mr-2">Sort by</label>
+                <select class="border px-2 py-1" name="sortby" id="sortby" onchange="this.form.submit()">
+                    <option value="newest" <%= sortby === 'newest' ? 'selected' : '' %>>Newest</option>
+                    <option value="price-low" <%= sortby === 'price-low' ? 'selected' : '' %>>Price: low to high</option>
+                    <option value="price-high" <%= sortby === 'price-high' ? 'selected' : '' %>>Price: high to low</option>
+                </select>
+            </form>
+            <nav class="flex flex-col gap-2">
+                <a href="/shop?filter=new">New Collection</a>
+                <a href="/shop">All Products</a>
+                <a href="/shop?filter=discounted">Discounted Products</a>
+            </nav>
+        </aside>
+
+        <section class="w-full md:w-3/4" aria-live="polite">
+            <% if (error) { %>
+                <p class="rounded bg-red-100 p-4 text-red-800"><%= error %></p>
+            <% } else if (products.length === 0) { %>
+                <p class="rounded bg-zinc-100 p-6 text-zinc-700">No products match this view yet.</p>
+            <% } else { %>
+                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    <% products.forEach(function(product) { %>
+                        <a class="block overflow-hidden rounded-md border" href="/products/<%= product._id %>">
+                            <div class="flex h-52 items-center justify-center" style="background-color: <%= product.bgColor %>">
+                                <img class="h-48 max-w-full object-contain" src="data:<%= product.imageContentType %>;base64,<%= product.image.toString('base64') %>" alt="<%= product.name %>">
                             </div>
-                            <a class="w-7 h-7 flex items-center justify-center rounded-full bg-white" href="">
-                                <i class="ri-add-line"></i>
-                            </a>
-                        </div>
-                    </div>
+                            <div class="flex items-center justify-between px-4 py-4" style="background-color: <%= product.panelColor %>; color: <%= product.textColor %>">
+                                <div>
+                                    <h2><%= product.name %></h2>
+                                    <% if (product.discount > 0) { %>
+                                        <p><del>₹ <%= product.price.toFixed(2) %></del> ₹ <%= (product.price * (1 - product.discount / 100)).toFixed(2) %></p>
+                                    <% } else { %>
+                                        <p>₹ <%= product.price.toFixed(2) %></p>
+                                    <% } %>
+                                </div>
+                                <% if (product.isNewCollection) { %><span class="rounded bg-white px-2 py-1 text-xs text-black">New</span><% } %>
+                            </div>
+                        </a>
                     <% }) %>
-            </div>
-        </div>
+                </div>
+            <% } %>
+        </section>
     </div>
-    <%- include('./partials/footer') %>
+</main>
+<%- include('./partials/footer') %>
