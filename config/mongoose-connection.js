@@ -15,17 +15,31 @@ function getMongoUri() {
     return 'mongodb://127.0.0.1:27017';
 }
 
-mongoose
-    // The existing Windows MongoDB database was created as `Carryva`. MongoDB
-    // treats database names case-insensitively on Windows and rejects creating
-    // `carryva` beside it with server error 13297. Keep an explicit override
-    // available for other environments, and match the existing local DB.
+const connection = mongoose.connection;
+const ready = mongoose
+    // Keep the existing local database name; production deployments should set
+    // MONGODB_DB explicitly alongside their connection URI.
     .connect(getMongoUri(), { dbName: process.env.MONGODB_DB || 'Carryva' })
-    .then(() => {
+    .then(async () => {
         dbgr('Connected to MongoDB');
+        const hello = await connection.db.admin().command({ hello: 1 });
+        connection.supportsTransactions = Boolean(hello.setName || hello.msg === 'isdbgrid');
+        if (!connection.supportsTransactions) {
+            console.warn('MongoDB is running standalone. Checkout and order cancellation require a replica set or MongoDB Atlas.');
+        }
+        return connection;
     })
-    .catch((err) => {
-        console.error('MongoDB connection failed:', err.message);
+    .catch((error) => {
+        console.error('MongoDB connection failed.', {
+            name: error.name || 'Error',
+            ...(Number.isInteger(error.code) ? { code: error.code } : {}),
+        });
+        throw error;
     });
 
-module.exports = mongoose.connection;
+// Startup awaits the rejected promise. This attached handler prevents an
+// unhandled rejection in tests that wait directly on Mongoose's connection.
+ready.catch(() => {});
+connection.ready = ready;
+
+module.exports = connection;

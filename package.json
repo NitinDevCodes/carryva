@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node app.js",
     "dev": "node --watch app.js",
-    "test": "node test/auth.test.js && node test/products.test.js && node test/cart.test.js && node test/orders.test.js",
+    "test": "node test/auth.test.js && node test/products.test.js && node test/cart.test.js && node test/orders.test.js && node test/standalone-safety.test.js",
+    "products:import-development": "node scripts/import-development-products.js",
     "owner:promote": "node scripts/promote-owner.js"
   },
   "keywords": [],
@@ -17,6 +18,7 @@
     "bcrypt": "^6.0.0",
     "config": "^5.0.1",
     "connect-flash": "^0.1.1",
+    "connect-mongo": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "debug": "^4.4.3",
     "dotenv": "^18.0.8",

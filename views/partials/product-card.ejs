@@ -1,0 +1,30 @@
+<% const salePrice = product.discountedPrice != null ? product.discountedPrice : product.price * (1 - (product.discount || 0) / 100); %>
+<% const hasDiscount = salePrice < product.price; %>
+<% const discountPercent = hasDiscount ? Math.round((1 - salePrice / product.price) * 100) : 0; %>
+<% const inStock = (product.availability || 'in-stock') === 'in-stock' && (product.stockQuantity ?? 1) > 0; %>
+<article class="product-card">
+    <a class="product-card-image" href="/products/<%= product._id %>" aria-label="View <%= product.name %>">
+        <div class="product-image-wash"></div>
+        <img src="data:<%= product.imageContentType %>;base64,<%= product.image.toString('base64') %>" alt="<%= product.name %>" loading="lazy">
+        <div class="product-badges">
+            <% if (product.isNewCollection) { %><span class="badge badge-new">New arrival</span><% } %>
+            <% if (hasDiscount) { %><span class="badge badge-sale"><%= discountPercent %>% off</span><% } %>
+        </div>
+        <% if (!inStock) { %><span class="stock-ribbon">Currently unavailable</span><% } %>
+    </a>
+    <div class="product-card-body">
+        <div class="product-card-copy">
+            <p class="eyebrow product-category"><%= product.category || 'Other' %><% if (product.colour && product.colour !== 'Not specified') { %><span aria-hidden="true"> · </span><%= product.colour %><% } %></p>
+            <h3><a href="/products/<%= product._id %>"><%= product.name %></a></h3>
+            <% if (product.description) { %><p class="product-card-description"><%= product.description %></p><% } %>
+        </div>
+        <div class="product-card-bottom">
+            <p class="product-price"><% if (hasDiscount) { %><del>₹ <%= product.price.toFixed(2) %></del><% } %><strong>₹ <%= salePrice.toFixed(2) %></strong></p>
+            <span class="stock-label <%= inStock ? 'is-available' : 'is-unavailable' %>"><%= inStock ? `${product.stockQuantity ?? 1} available` : 'Unavailable' %></span>
+        </div>
+        <form action="/cart/items/<%= product._id %>" method="post" class="product-card-action">
+            <input type="hidden" name="quantity" value="1">
+            <button class="button button-dark button-small" type="submit" <%= inStock ? '' : 'disabled' %>><%= inStock ? 'Add to bag' : 'Out of stock' %></button>
+        </form>
+    </div>
+</article>

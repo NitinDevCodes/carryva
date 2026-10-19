@@ -29,6 +29,12 @@ const userSchema = mongoose.Schema({
         required: true,
         index: true,
     },
+    authVersion: {
+        type: Number,
+        default: 0,
+        min: 0,
+        select: false,
+    },
     cart:{
         type: Array,
         default: []

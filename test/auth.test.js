@@ -3,9 +3,10 @@ const crypto = require('node:crypto');
 const { after, before, test } = require('node:test');
 
 process.env.NODE_ENV = 'production';
+process.env.TRUST_PROXY_HOPS = '1';
 process.env.JWT_KEY = crypto.randomBytes(48).toString('base64url');
 process.env.EXPRESS_SESSION_SECRET = crypto.randomBytes(48).toString('base64url');
-process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017';
+process.env.MONGODB_URI = process.env.CARRYVA_TEST_MONGODB_URI || 'mongodb://127.0.0.1:27017';
 process.env.MONGODB_DB = `carryva_auth_test_${process.pid}`;
 
 const app = require('../app');
@@ -78,10 +79,36 @@ test('public shop and product listings load; owner operations reject requests wi
     const admin = await fetch(`${baseUrl}/owners/admin`, { redirect: 'manual' });
     assert.equal(admin.status, 302);
     assert.equal(admin.headers.get('location'), '/');
+    assert.equal(app.sessionStore.constructor.name, 'MongoStore');
+    const sessionId = `carryva-session-test-${process.pid}`;
+    const session = { cookie: { originalMaxAge: 60000, expires: new Date(Date.now() + 60000) }, testMarker: 'persistent' };
+    await new Promise((resolve, reject) => app.sessionStore.set(sessionId, session, (error) => error ? reject(error) : resolve()));
+    const storedSession = await new Promise((resolve, reject) => app.sessionStore.get(sessionId, (error, value) => error ? reject(error) : resolve(value)));
+    assert.equal(storedSession.testMarker, 'persistent');
+    await new Promise((resolve, reject) => app.sessionStore.destroy(sessionId, (error) => error ? reject(error) : resolve()));
 
     const createProduct = await postForm('/products/create', {});
     assert.equal(createProduct.status, 302);
     assert.equal(createProduct.headers.get('location'), '/');
+});
+
+test('security headers are present and cross-origin form writes are rejected', async () => {
+    const page = await fetch(`${baseUrl}/shop`);
+    assert.equal(page.status, 200);
+    assert.equal(page.headers.get('x-powered-by'), null);
+    assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(page.headers.get('x-frame-options'), 'DENY');
+    assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+    const httpsPage = await fetch(`${baseUrl}/shop`, { headers: { 'x-forwarded-proto': 'https' } });
+    assert.match(httpsPage.headers.get('strict-transport-security'), /max-age=31536000/);
+
+    const rejected = await fetch(`${baseUrl}/users/login`, {
+        method: 'POST',
+        headers: { origin: 'https://attacker.example', 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ email: credentials.email, password: credentials.password }),
+        redirect: 'manual',
+    });
+    assert.equal(rejected.status, 403);
 });
 
 test('registration validates input and rejects malformed or weak credentials', async () => {
@@ -131,6 +158,7 @@ test('registration hashes the password, signs an expiring token, and permits pro
         audience: 'carryva-users',
     });
     assert.equal(claims.email, credentials.email);
+    assert.equal(claims.ver, 0);
     assert.ok(claims.sub);
     assert.equal(claims.exp - claims.iat, 24 * 60 * 60);
 
@@ -218,7 +246,13 @@ test('tampered and expired tokens are rejected and cleared on owner routes', asy
         }
     );
 
-    for (const token of [`${validToken}tampered`, validToken]) {
+    const unexpectedAlgorithm = jwt.sign(
+        { email: credentials.email, ver: 0 },
+        process.env.JWT_KEY,
+        { subject: String(registeredUser._id), expiresIn: '1h', issuer: 'carryva', audience: 'carryva-users', algorithm: 'HS512' },
+    );
+
+    for (const token of [`${validToken}tampered`, validToken, unexpectedAlgorithm]) {
         const response = await fetch(`${baseUrl}/owners/admin`, {
             headers: { cookie: `token=${token}` },
             redirect: 'manual',
@@ -242,4 +276,11 @@ test('logout clears the auth cookie and Express session; the token no longer rea
 
     const protectedPage = await fetch(`${baseUrl}/owners/admin`, { redirect: 'manual' });
     assert.equal(protectedPage.status, 302);
+
+    const replay = await fetch(`${baseUrl}/cart`, {
+        headers: { cookie: `token=${token}` },
+        redirect: 'manual',
+    });
+    assert.equal(replay.status, 302);
+    assert.equal((await User.findById(registeredUser._id).select('+authVersion')).authVersion, 1);
 });

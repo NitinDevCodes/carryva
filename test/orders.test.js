@@ -7,7 +7,7 @@ const { after, before, beforeEach, test } = require('node:test');
 process.env.NODE_ENV = 'production';
 process.env.JWT_KEY = crypto.randomBytes(48).toString('base64url');
 process.env.EXPRESS_SESSION_SECRET = crypto.randomBytes(48).toString('base64url');
-process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017';
+process.env.MONGODB_URI = process.env.CARRYVA_TEST_MONGODB_URI || 'mongodb://127.0.0.1:27017';
 process.env.MONGODB_DB = `carryva_orders_test_${process.pid}`;
 
 const app = require('../app');

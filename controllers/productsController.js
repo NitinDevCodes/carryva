@@ -180,19 +180,28 @@ function notFoundProduct(res) {
 module.exports.listProducts = async (req, res) => {
     const filter = ['new', 'discounted'].includes(req.query.filter) ? req.query.filter : 'all';
     const sortby = ['newest', 'price-low', 'price-high'].includes(req.query.sortby) ? req.query.sortby : 'newest';
-    const query = filter === 'new' ? { isNewCollection: true } : filter === 'discounted' ? { discount: { $gt: 0 } } : {};
+    const category = typeof req.query.category === 'string' && req.query.category.trim().length <= 60
+        ? req.query.category.trim()
+        : '';
+    const query = {};
+    if (filter === 'new') query.isNewCollection = true;
+    if (filter === 'discounted') query.discount = { $gt: 0 };
+    if (category) query.category = category;
     const sort = sortby === 'price-low' ? { price: 1, createdAt: -1 }
         : sortby === 'price-high' ? { price: -1, createdAt: -1 }
             : { createdAt: -1, _id: -1 };
 
     try {
         const products = await Product.find(query).sort(sort).lean();
-        return res.render('shop', { products, filter, sortby, error: null });
+        const categories = await Product.distinct('category');
+        return res.render('shop', { products, filter, sortby, category, categories: categories.filter(Boolean).sort(), error: null });
     } catch (error) {
         return res.status(503).render('shop', {
             products: [],
             filter,
             sortby,
+            category,
+            categories: [],
             error: 'Products are temporarily unavailable. Please try again shortly.',
         });
     }

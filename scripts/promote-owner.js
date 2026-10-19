@@ -30,7 +30,11 @@ async function main() {
 if (require.main === module) {
     main()
         .catch((error) => {
-            console.error(error.message);
+            if (error.name === 'Error') console.error(error.message);
+            else console.error('Owner promotion failed.', {
+                name: error.name || 'Error',
+                ...(Number.isInteger(error.code) ? { code: error.code } : {}),
+            });
             process.exitCode = 1;
         })
         .finally(async () => {

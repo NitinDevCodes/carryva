@@ -1,86 +1,65 @@
 <%- include('./partials/header') %>
-
-    <% if(error.length>0){ %>
-        <div class="absolute top-5 left-1/2 -translate-x-1/2 -translate-y-1/2 p-3 rounded-md bg-red-500">
-            <span class="inline-block mt-1 mb-1 text-white">
-                <%= error %>
-            </span>
+<main id="main-content">
+    <% if (error && error.length) { %><div class="shell page-alert page-alert-error" role="alert"><% error.forEach(function(message) { %><p><%= message %></p><% }) %></div><% } %>
+    <section class="home-hero shell" aria-labelledby="hero-title">
+        <div class="hero-copy">
+            <p class="eyebrow eyebrow-accent">A considered collection of bags</p>
+            <h1 id="hero-title">Carry your day <em>beautifully.</em></h1>
+            <p class="hero-intro">Everyday companions with room for the things that matter. Find the shape, colour, and carry that feels like you.</p>
+            <div class="hero-actions"><a class="button button-dark" href="/shop">Explore the collection <span aria-hidden="true">↗</span></a><a class="text-link" href="/shop?filter=new">Discover new arrivals</a></div>
+            <p class="hero-note"><span class="note-rule"></span> An edit of backpacks, totes, and travel bags</p>
         </div>
-        <% } %>
-            <div class="w-full h-screen flex px-20">
-                <div class="w-1/2 flex items-center justify-center h-screen">
-                    <div class="w-full px-32">
-                        <h3 class="text-4xl">welcome to <span class="text-blue-400 font-semibold">Carryva</span></h3>
-                        <h4 class="text-2xl mb-5">create your account</h4>
-                        <form autocomplete="off" action="/users/register" method="post">
-                            <input type="hidden" name="returnTo" value="<%= returnTo %>">
-                            <input
-                                class="bg-zinc-100 block w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                                type="text" placeholder="Full Name" name="fullName" minlength="3" maxlength="80" required autocomplete="name">
-                            <input
-                                class="bg-zinc-100 block w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                                type="email" placeholder="Email" name="email" maxlength="254" required autocomplete="email">
-                            <input
-                                class="bg-zinc-100 block w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                                type="password" placeholder="Password" name="password" minlength="8" maxlength="72" required autocomplete="new-password">
-                            <input class="px-5 rounded-full py-3 mt-2 bg-blue-500 text-white" type="submit"
-                                value="Create My Account">
-                        </form>
-                    </div>
-                </div>
-                <div class="w-1/2 flex items-center justify-center h-screen">
-                    <div class="w-full px-32">
-                        <h4 class="text-2xl capitalize mb-5">login your account</h4>
-                        <form autocomplete="off" action="/users/login" method="post">
-                            <input type="hidden" name="returnTo" value="<%= returnTo %>">
-                            <input
-                                class="block bg-zinc-100 w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                                type="email" placeholder="Email" name="email" maxlength="254" required autocomplete="username">
-                            <input
-                                class="block bg-zinc-100 w-full px-3 py-2 border-[1px] rounded-md mb-3 border-zinc-200"
-                                type="password" placeholder="Password" name="password" required autocomplete="current-password">
-                            <input class="px-5 block rounded-full py-3 mt-2 bg-blue-500 text-white" type="submit"
-                                value="Login">
-                        </form>
-                    </div>
-                </div>
+        <div class="hero-visual">
+            <div class="hero-arch"></div>
+            <% if (featuredProducts.length) { const heroProduct = featuredProducts[0]; %>
+                <img class="hero-bag" src="data:<%= heroProduct.imageContentType %>;base64,<%= heroProduct.image.toString('base64') %>" alt="<%= heroProduct.name %>" fetchpriority="high">
+                <a class="hero-caption" href="/products/<%= heroProduct._id %>"><span class="hero-caption-label">Featured bag</span><strong><%= heroProduct.name %></strong><span class="hero-caption-arrow" aria-hidden="true">↗</span></a>
+            <% } else { %><div class="hero-empty"><span>Carryva</span><p>Made for the everyday</p></div><% } %>
+            <span class="hero-index" aria-hidden="true">C / 01</span>
+        </div>
+    </section>
+
+    <section class="collection-strip" aria-label="Shop by collection">
+        <div class="shell collection-strip-inner"><span>Find your kind of carry</span><a href="/shop?category=Backpack">Backpacks <span aria-hidden="true">↗</span></a><a href="/shop?category=Tote">Totes <span aria-hidden="true">↗</span></a><a href="/shop?category=Duffel">Travel bags <span aria-hidden="true">↗</span></a><a href="/shop?filter=discounted">The edit <span aria-hidden="true">↗</span></a></div>
+    </section>
+
+    <section class="content-section shell" aria-labelledby="featured-products-heading">
+        <div class="section-heading"><div><p class="eyebrow">The Carryva selection</p><h2 id="featured-products-heading">Chosen for the everyday</h2></div><a class="text-link" href="/shop">Shop all bags <span aria-hidden="true">↗</span></a></div>
+        <% if (productError) { %><p class="page-alert page-alert-error" role="alert"><%= productError %></p>
+        <% } else if (featuredProducts.length === 0) { %><div class="empty-state"><p class="eyebrow">A little patience</p><h3>Our featured collection is being curated.</h3><a class="button button-outline" href="/shop">Browse all bags</a></div>
+        <% } else { %><div class="product-grid product-grid-featured"><% featuredProducts.forEach(function(product) { %><%- include('./partials/product-card', { product }) %><% }) %></div><% } %>
+    </section>
+
+    <% if (newArrivals.length) { %><section class="new-arrivals-band" aria-labelledby="new-arrivals-heading"><div class="shell content-section">
+        <div class="section-heading"><div><p class="eyebrow eyebrow-accent">Just added</p><h2 id="new-arrivals-heading">New to the collection</h2></div><a class="text-link" href="/shop?filter=new">See all new arrivals <span aria-hidden="true">↗</span></a></div>
+        <div class="product-grid product-grid-featured"><% newArrivals.forEach(function(product) { %><%- include('./partials/product-card', { product }) %><% }) %></div>
+    </div></section><% } %>
+
+    <section class="brand-note shell"><p class="eyebrow">Carryva, every day</p><h2>Room for the moments<br>that make a day yours.</h2><a class="button button-outline" href="/shop">Find your everyday bag</a></section>
+
+    <section class="account-section" id="account" aria-labelledby="account-heading">
+        <div class="shell account-shell">
+            <div class="account-intro"><p class="eyebrow eyebrow-accent">Welcome to Carryva</p><h2 id="account-heading">A good day<br>starts with a good bag.</h2><p>Sign in to continue shopping or create an account to keep your Carryva orders together.</p></div>
+            <div class="account-forms">
+                <section class="account-card" aria-labelledby="login-heading"><h3 id="login-heading">Welcome back</h3><p class="form-hint">Sign in to your account</p>
+                    <form autocomplete="on" action="/users/login" method="post" class="form-stack">
+                        <input type="hidden" name="returnTo" value="<%= returnTo %>">
+                        <label>Email address<input type="email" name="email" maxlength="254" required autocomplete="username"></label>
+                        <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+                        <button class="button button-dark button-full" type="submit">Sign in</button>
+                    </form>
+                </section>
+                <section class="account-card account-card-soft" aria-labelledby="register-heading"><h3 id="register-heading">New to Carryva?</h3><p class="form-hint">Create an account to begin</p>
+                    <form autocomplete="on" action="/users/register" method="post" class="form-stack">
+                        <input type="hidden" name="returnTo" value="<%= returnTo %>">
+                        <label>Full name<input type="text" name="fullName" minlength="3" maxlength="80" required autocomplete="name"></label>
+                        <label>Email address<input type="email" name="email" maxlength="254" required autocomplete="email"></label>
+                        <label>Password<input type="password" name="password" minlength="8" maxlength="72" required autocomplete="new-password"></label>
+                        <button class="button button-outline button-full" type="submit">Create account</button>
+                    </form>
+                </section>
             </div>
-            <section class="mx-auto max-w-7xl px-6 py-12 md:px-20" aria-labelledby="featured-products-heading">
-                <div class="mb-6 flex items-end justify-between gap-4">
-                    <div>
-                        <p class="text-sm uppercase tracking-wide text-zinc-500">Carryva selection</p>
-                        <h2 id="featured-products-heading" class="text-2xl font-semibold">Featured bags</h2>
-                    </div>
-                    <a class="underline" href="/shop">Shop all bags</a>
-                </div>
-                <% if (productError) { %>
-                    <p class="rounded bg-red-100 p-4 text-red-800"><%= productError %></p>
-                <% } else if (featuredProducts.length === 0) { %>
-                    <p class="text-zinc-600">Our featured collection is being curated.</p>
-                <% } else { %>
-                    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                        <% featuredProducts.forEach(function(product) { %>
-                            <% const salePrice = product.discountedPrice != null ? product.discountedPrice : product.price * (1 - (product.discount || 0) / 100); %>
-                            <% const canAdd = (product.availability || 'in-stock') === 'in-stock' && (product.stockQuantity ?? 1) > 0; %>
-                            <article class="overflow-hidden rounded-md border">
-                            <a class="block" href="/products/<%= product._id %>">
-                                <div class="flex h-48 items-center justify-center" style="background-color: <%= product.bgColor || '#f4f4f4' %>">
-                                    <img class="h-44 max-w-full object-contain" src="data:<%= product.imageContentType %>;base64,<%= product.image.toString('base64') %>" alt="<%= product.name %>">
-                                </div>
-                                <div class="p-4">
-                                    <p class="text-sm text-zinc-500"><%= product.category || 'Other' %></p>
-                                    <h3 class="font-medium"><%= product.name %></h3>
-                                    <p><% if (salePrice < product.price) { %><del>₹ <%= product.price.toFixed(2) %></del> <% } %><strong>₹ <%= salePrice.toFixed(2) %></strong></p>
-                                </div>
-                            </a>
-                            <form action="/cart/items/<%= product._id %>" method="post" class="flex items-center justify-between border-t p-3">
-                                <input type="hidden" name="quantity" value="1">
-                                <span class="text-xs text-zinc-600"><%= canAdd ? `${product.stockQuantity ?? 1} available` : 'Unavailable' %></span>
-                                <button type="submit" <%= canAdd ? '' : 'disabled' %> class="rounded-full bg-zinc-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40">Add to cart</button>
-                            </form>
-                            </article>
-                        <% }) %>
-                    </div>
-                <% } %>
-            </section>
-            <%- include('./partials/footer') %>
+        </div>
+    </section>
+</main>
+<%- include('./partials/footer') %>

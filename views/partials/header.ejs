@@ -1,34 +1,45 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f8f6f1">
+    <title>Carryva — bags for the everyday</title>
+    <link rel="stylesheet" href="/css/site.css">
+    <script src="/js/site.js" defer></script>
 </head>
-
-<body class="font-['helvetica_now_display']">
-    <nav class="w-full fixed top-0 left-0 z-20 flex items-center justify-between bg-white/90 px-5 py-3 backdrop-blur">
-        <h3 class="text-xl">Carryva</h3>
-        <div class="flex items-center gap-3">
-        <a class="rounded-full px-3 py-2 text-sm underline" href="/orders">Orders</a>
-        <a class="flex items-center gap-2 rounded-full border px-4 py-2 text-sm" href="/cart" aria-label="Shopping cart">
-            <i class="ri-shopping-bag-line" aria-hidden="true"></i>
-            <span>Cart</span>
-            <span id="cart-count" class="flex h-5 min-w-5 items-center justify-center rounded-full bg-zinc-900 px-1 text-xs text-white" aria-live="polite">0</span>
+<body>
+<a class="skip-link" href="#main-content">Skip to content</a>
+<header class="site-header">
+    <div class="announcement">A considered collection of bags for wherever the day takes you</div>
+    <div class="header-main shell">
+        <details class="mobile-menu">
+            <summary aria-label="Open navigation"><span class="menu-lines" aria-hidden="true"></span></summary>
+            <nav class="mobile-menu-panel" aria-label="Mobile navigation">
+                <a href="/shop">Shop all bags</a>
+                <a href="/shop?filter=new">New arrivals</a>
+                <a href="/shop?filter=discounted">The edit</a>
+                <a href="/?returnTo=%2Forders#account">Sign in / create account</a>
+                <a href="/orders">Your orders</a>
+            </nav>
+        </details>
+        <a class="brand" href="/" aria-label="Carryva home">
+            <span class="brand-mark" aria-hidden="true">C</span>
+            <span class="brand-name">carryva</span>
         </a>
-        </div>
-    </nav>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            fetch('/cart/count', { headers: { Accept: 'application/json' } })
-                .then((response) => response.ok && !response.redirected ? response.json() : null)
-                .then((result) => {
-                    const count = document.getElementById('cart-count');
-                    if (count && result && Number.isInteger(result.count)) count.textContent = String(result.count);
-                })
-                .catch(() => {});
-        });
-    </script>
+        <nav class="desktop-nav" aria-label="Main navigation">
+            <a href="/shop">Shop</a>
+            <a href="/shop?filter=new">New arrivals</a>
+            <a href="/shop?filter=discounted">The edit</a>
+        </nav>
+        <nav class="header-actions" aria-label="Your account and shopping bag">
+            <a class="header-text-link" href="/?returnTo=%2Fshop#account">Account</a>
+            <a class="header-text-link orders-link" href="/orders">Orders</a>
+            <a class="cart-link" href="/cart" aria-label="Shopping bag">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 8.5h11l1 12h-13l1-12Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg>
+                <span class="cart-label">Bag</span>
+                <span class="cart-count" id="cart-count" aria-live="polite" aria-atomic="true">0</span>
+            </a>
+        </nav>
+    </div>
+</header>

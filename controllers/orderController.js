@@ -5,6 +5,7 @@ const Product = require('../models/product-model');
 const Order = require('../models/order-model');
 
 const DELIVERY_FEE = 0;
+const MAX_ORDER_IMAGE_BYTES = 12 * 1024 * 1024;
 const transitions = {
     placed: ['confirmed', 'cancelled'],
     confirmed: ['processing', 'cancelled'],
@@ -57,22 +58,31 @@ function productAvailable(product, quantity) {
         stockQuantity >= quantity && quantity >= 1;
 }
 
-async function loadSummary(userId) {
-    const cart = await Cart.findOne({ userId });
+async function loadSummary(userId, session = null) {
+    let cartQuery = Cart.findOne({ userId });
+    if (session) cartQuery = cartQuery.session(session);
+    const cart = await cartQuery;
     if (!cart || !cart.items.length) return { error: 'Your cart is empty.' };
     const ids = cart.items.map((item) => item.productId);
     if (ids.some((id) => !mongoose.isValidObjectId(id))) return { error: 'Your cart contains an invalid product. Review your cart and try again.' };
-    const products = await Product.find({ _id: { $in: ids } }).lean();
+    let productQuery = Product.find({ _id: { $in: ids } });
+    if (session) productQuery = productQuery.session(session);
+    const products = await productQuery.lean();
     const byId = new Map(products.map((product) => [String(product._id), product]));
     const items = [];
     let subtotalCents = 0;
     let discountCents = 0;
+    let imageBytes = 0;
     for (const cartItem of cart.items) {
         const product = byId.get(String(cartItem.productId));
         if (!product) return { error: 'A product in your cart is no longer available. Review your cart and try again.' };
         if (!Number.isSafeInteger(cartItem.quantity) || cartItem.quantity < 1) return { error: 'A cart quantity is invalid. Review your cart and try again.' };
         if (!productAvailable(product, cartItem.quantity)) return { error: `${product.name} is unavailable or has insufficient stock. Update your cart before checking out.` };
         const price = priceFor(product);
+        imageBytes += Buffer.isBuffer(product.image) ? product.image.length : 0;
+        if (imageBytes > MAX_ORDER_IMAGE_BYTES) {
+            return { error: 'The images in this cart exceed the order size limit. Remove an item or contact the store for help.' };
+        }
         const lineSubtotal = price.regularCents * cartItem.quantity;
         const lineDiscount = (price.regularCents - price.unitCents) * cartItem.quantity;
         subtotalCents += lineSubtotal;
@@ -102,6 +112,18 @@ async function loadSummary(userId) {
     };
 }
 
+function transactionsUnavailable(error) {
+    return error?.code === 20 || error?.codeName === 'IllegalOperation' ||
+        /transaction numbers are only allowed|transactions? (?:are )?not supported|replica set or mongos/i.test(String(error?.message || ''));
+}
+
+function logOrderFailure(operation, error) {
+    console.error(`[orders] ${operation} failed`, {
+        name: error?.name || 'Error',
+        ...(Number.isInteger(error?.code) ? { code: error.code } : {}),
+    });
+}
+
 module.exports.showCheckout = async (req, res) => {
     try {
         if (!req.session.checkoutKey) req.session.checkoutKey = crypto.randomUUID();
@@ -117,57 +139,41 @@ module.exports.showCheckout = async (req, res) => {
 module.exports.placeOrder = async (req, res) => {
     const key = req.body?.idempotencyKey;
     if (!validKey(key)) return res.status(400).send('Checkout expired. Please return to checkout and try again.');
+    const addressResult = validateAddress(req.body || {});
+    if (addressResult.error) {
+        req.session.checkoutKey = crypto.randomUUID();
+        const summary = await loadSummary(req.user._id).catch(() => null);
+        return renderCheckout(req, res, 400, addressResult.error, summary && !summary.error ? {
+            ...addressResult.value, cartItems: summary.items, totals: summary.totals,
+        } : {});
+    }
+    if (req.body.paymentMethod !== 'cash-on-delivery') {
+        req.session.checkoutKey = crypto.randomUUID();
+        const summary = await loadSummary(req.user._id).catch(() => null);
+        return renderCheckout(req, res, 400, 'Choose cash on delivery to place this order.', summary && !summary.error ? {
+            ...addressResult.value, cartItems: summary.items, totals: summary.totals,
+        } : {});
+    }
+
+    let session;
+    let transactionResult = null;
     try {
-        const existing = await Order.findOne({ customerId: req.user._id, idempotencyKey: key });
-        if (existing) {
-            if (existing.placementStatus === 'placed') return res.redirect(303, `/orders/${existing._id}/confirmation`);
-            return res.status(409).send('This checkout is already being processed. Please check your order history shortly.');
-        }
-        const addressResult = validateAddress(req.body || {});
-        if (addressResult.error) {
-            req.session.checkoutKey = crypto.randomUUID();
-            const summary = await loadSummary(req.user._id);
-            return renderCheckout(req, res, 400, addressResult.error, summary.error ? {} : {
-                ...addressResult.value,
-                cartItems: summary.items,
-                totals: summary.totals,
-            });
-        }
-        if (req.body.paymentMethod !== 'cash-on-delivery') {
-            req.session.checkoutKey = crypto.randomUUID();
-            const summary = await loadSummary(req.user._id);
-            return renderCheckout(req, res, 400, 'Choose cash on delivery to place this order.', summary.error ? {} : {
-                ...addressResult.value, cartItems: summary.items, totals: summary.totals,
-            });
-        }
+        session = await mongoose.startSession();
+        await session.withTransaction(async () => {
+            const existing = await Order.findOne({ customerId: req.user._id, idempotencyKey: key }).session(session);
+            if (existing) {
+                transactionResult = existing.placementStatus === 'placed'
+                    ? { order: existing }
+                    : { conflict: true };
+                return;
+            }
 
-        const summary = await loadSummary(req.user._id);
-        if (summary.error) {
-            req.session.checkoutKey = crypto.randomUUID();
-            return renderCheckout(req, res, 400, summary.error);
-        }
-        const order = new Order({
-            customerId: req.user._id,
-            idempotencyKey: key,
-            placementStatus: 'processing',
-            items: summary.items.map(({ productId, name, image, imageContentType, quantity, regularUnitPrice, unitPrice, discount }) => ({
-                productId, name, image, imageContentType, quantity, regularUnitPrice, unitPrice, discount,
-            })),
-            subtotal: summary.totals.subtotal,
-            discount: summary.totals.discount,
-            deliveryFee: summary.totals.deliveryFee,
-            total: summary.totals.total,
-            deliveryAddress: addressResult.value,
-            paymentMethod: 'cash-on-delivery',
-            paymentStatus: 'pending',
-            status: 'placed',
-        });
-        await order.save();
+            const summary = await loadSummary(req.user._id, session);
+            if (summary.error) {
+                transactionResult = { validationError: summary.error };
+                return;
+            }
 
-        const decremented = [];
-        let cartCleared = false;
-        let cartForRestore = null;
-        try {
             for (const item of summary.items) {
                 const product = await Product.findOneAndUpdate(
                     {
@@ -183,57 +189,78 @@ module.exports.placeOrder = async (req, res) => {
                         ],
                     },
                     [{ $set: { stockQuantity: { $subtract: [{ $ifNull: ['$stockQuantity', 1] }, item.quantity] } } }],
-                    { returnDocument: 'after', updatePipeline: true },
+                    { session, returnDocument: 'after', updatePipeline: true },
                 );
-                if (!product) throw Object.assign(new Error('insufficient-stock'), { safeCheckoutError: `${item.name} no longer has enough stock. Your cart is unchanged.` });
-                decremented.push(item);
-            }
-            const currentCart = await Cart.findOne({ userId: req.user._id });
-            const sameItems = currentCart && currentCart.items.length === summary.cart.items.length &&
-                currentCart.items.every((item, index) => String(item.productId) === String(summary.cart.items[index].productId) && item.quantity === summary.cart.items[index].quantity);
-            if (!sameItems || currentCart.__v !== summary.cart.__v) {
-                throw Object.assign(new Error('cart-changed'), { safeCheckoutError: 'Your cart changed during checkout. Please review it and try again.' });
-            }
-            currentCart.items = [];
-            await currentCart.save();
-            cartCleared = true;
-            cartForRestore = currentCart;
-            order.placementStatus = 'placed';
-            await order.save();
-            delete req.session.checkoutKey;
-            return res.redirect(303, `/orders/${order._id}/confirmation`);
-        } catch (error) {
-            if (cartCleared && cartForRestore) {
-                try {
-                    cartForRestore.items = summary.cart.items.map((item) => ({ productId: item.productId, quantity: item.quantity }));
-                    await cartForRestore.save();
-                } catch (restoreError) {
-                    console.error('[orders] cart rollback failed', { name: restoreError.name });
+                if (!product) {
+                    transactionResult = { validationError: `${item.name} no longer has enough stock. Your cart is unchanged.` };
+                    throw Object.assign(new Error('checkout-validation-failed'), { safeCheckoutValidation: true });
                 }
             }
-            for (const item of decremented.reverse()) {
-                try { await Product.updateOne({ _id: item.productId }, { $inc: { stockQuantity: item.quantity } }); }
-                catch (rollbackError) { console.error('[orders] inventory rollback failed', { productId: String(item.productId), name: rollbackError.name }); }
+            const cartFilter = { _id: summary.cart._id };
+            if (Number.isInteger(summary.cart.__v)) cartFilter.__v = summary.cart.__v;
+            else cartFilter.__v = { $exists: false };
+            const cartUpdate = { $set: { items: [] } };
+            if (Number.isInteger(summary.cart.__v)) cartUpdate.$inc = { __v: 1 };
+            else cartUpdate.$set.__v = 1;
+            const clearedCart = await Cart.updateOne(cartFilter, cartUpdate, { session });
+            if (clearedCart.matchedCount !== 1) {
+                transactionResult = { conflict: true };
+                throw Object.assign(new Error('cart-changed'), { safeCheckoutConflict: true });
             }
-            order.placementStatus = 'failed';
-            await order.save().catch((saveError) => console.error('[orders] failed placement state could not be saved', { name: saveError.name }));
-            delete req.session.checkoutKey;
-            if (error.safeCheckoutError) {
-                const refreshed = await loadSummary(req.user._id).catch(() => null);
-                return renderCheckout(req, res, 409, error.safeCheckoutError, refreshed && !refreshed.error ? {
-                    ...addressResult.value, cartItems: refreshed.items, totals: refreshed.totals,
-                } : {});
-            }
-            throw error;
+
+            const [order] = await Order.create([{
+                customerId: req.user._id,
+                idempotencyKey: key,
+                placementStatus: 'placed',
+                items: summary.items.map(({ productId, name, image, imageContentType, quantity, regularUnitPrice, unitPrice, discount }) => ({
+                    productId, name, image, imageContentType, quantity, regularUnitPrice, unitPrice, discount,
+                })),
+                subtotal: summary.totals.subtotal,
+                discount: summary.totals.discount,
+                deliveryFee: summary.totals.deliveryFee,
+                total: summary.totals.total,
+                deliveryAddress: addressResult.value,
+                paymentMethod: 'cash-on-delivery',
+                paymentStatus: 'pending',
+                status: 'placed',
+            }], { session });
+            transactionResult = { order };
+        }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, readPreference: 'primary' });
+
+        if (transactionResult?.validationError) {
+            req.session.checkoutKey = crypto.randomUUID();
+            const summary = await loadSummary(req.user._id).catch(() => null);
+            return renderCheckout(req, res, 409, transactionResult.validationError, summary && !summary.error ? {
+                ...addressResult.value, cartItems: summary.items, totals: summary.totals,
+            } : {});
         }
+        if (transactionResult?.conflict) return res.status(409).send('Your cart or checkout changed during processing. Please review your cart and try again.');
+        if (transactionResult?.order) {
+            delete req.session.checkoutKey;
+            return res.redirect(303, `/orders/${transactionResult.order._id}/confirmation`);
+        }
+        throw new Error('checkout-transaction-did-not-complete');
     } catch (error) {
+        if (transactionsUnavailable(error)) {
+            logOrderFailure('MongoDB transaction requirement', error);
+            return res.status(503).send('Checkout is unavailable because this MongoDB server does not support transactions. Configure a replica set or MongoDB Atlas and try again. Your cart and stock are unchanged.');
+        }
+        if (error.safeCheckoutValidation) {
+            req.session.checkoutKey = crypto.randomUUID();
+            const summary = await loadSummary(req.user._id).catch(() => null);
+            return renderCheckout(req, res, 409, transactionResult.validationError, summary && !summary.error ? {
+                ...addressResult.value, cartItems: summary.items, totals: summary.totals,
+            } : {});
+        }
         if (error.code === 11000) {
             const duplicate = await Order.findOne({ customerId: req.user._id, idempotencyKey: key });
             if (duplicate?.placementStatus === 'placed') return res.redirect(303, `/orders/${duplicate._id}/confirmation`);
             return res.status(409).send('This checkout is already being processed. Please check your order history shortly.');
         }
-        console.error('[orders] order placement failed', { name: error.name, code: error.code, message: String(error.message || '').slice(0, 240) });
+        logOrderFailure('order placement', error);
         return res.status(503).send('Unable to place your order right now. Your cart has been kept. Please try again.');
+    } finally {
+        if (session) await session.endSession();
     }
 };
 
@@ -281,40 +308,46 @@ module.exports.ownerDetail = async (req, res) => {
 module.exports.updateStatus = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).send('Order not found.');
     const next = req.body?.status;
+    let session;
     try {
-        const order = await Order.findOne({ _id: req.params.id, placementStatus: 'placed' });
-        if (!order) return res.status(404).send('Order not found.');
-        if (!transitions[order.status]?.includes(next)) return res.status(400).send('That order status transition is not allowed.');
-        if (next === 'cancelled') {
-            const restored = [];
-            try {
-                for (const item of order.items) {
-                    await Product.updateOne({ _id: item.productId }, { $inc: { stockQuantity: item.quantity } });
-                    restored.push(item);
-                }
-                const updated = await Order.findOneAndUpdate(
-                    { _id: order._id, placementStatus: 'placed', status: order.status },
-                    { $set: { status: next } },
-                    { returnDocument: 'after' },
-                );
-                if (!updated) throw Object.assign(new Error('order-status-conflict'), { statusConflict: true });
-            } catch (error) {
-                for (const item of restored.reverse()) {
-                    await Product.updateOne({ _id: item.productId, stockQuantity: { $gte: item.quantity } }, { $inc: { stockQuantity: -item.quantity } })
-                        .catch((rollbackError) => console.error('[orders] cancellation rollback failed', { name: rollbackError.name }));
-                }
-                if (error.statusConflict) return res.status(409).send('This order changed in another request. Refresh and try again.');
-                throw error;
+        session = await mongoose.startSession();
+        let result = null;
+        await session.withTransaction(async () => {
+            const order = await Order.findOne({ _id: req.params.id, placementStatus: 'placed' }).session(session);
+            if (!order) {
+                result = { notFound: true };
+                return;
             }
-        } else {
+            if (!transitions[order.status]?.includes(next)) {
+                result = { invalidTransition: true };
+                return;
+            }
+            if (next === 'cancelled') {
+                for (const item of order.items) {
+                    await Product.updateOne({ _id: item.productId }, { $inc: { stockQuantity: item.quantity } }, { session });
+                }
+            }
             const updated = await Order.findOneAndUpdate(
                 { _id: order._id, placementStatus: 'placed', status: order.status },
                 { $set: { status: next } },
-                { returnDocument: 'after' },
+                { session, returnDocument: 'after' },
             );
-            if (!updated) return res.status(409).send('This order changed in another request. Refresh and try again.');
-        }
+            if (!updated) throw Object.assign(new Error('order-status-conflict'), { statusConflict: true });
+            result = { orderId: order._id };
+        }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, readPreference: 'primary' });
+        if (result?.notFound) return res.status(404).send('Order not found.');
+        if (result?.invalidTransition) return res.status(400).send('That order status transition is not allowed.');
         req.flash('success', 'Order status updated.');
-        return res.redirect(303, `/owners/orders/${order._id}`);
-    } catch (error) { return res.status(503).send('Unable to update this order right now.'); }
+        return res.redirect(303, `/owners/orders/${result.orderId}`);
+    } catch (error) {
+        if (transactionsUnavailable(error)) {
+            logOrderFailure('MongoDB transaction requirement', error);
+            return res.status(503).send('Order updates are unavailable because this MongoDB server does not support transactions. Configure a replica set or MongoDB Atlas and try again.');
+        }
+        if (error.statusConflict) return res.status(409).send('This order changed in another request. Refresh and try again.');
+        logOrderFailure('order status update', error);
+        return res.status(503).send('Unable to update this order right now.');
+    } finally {
+        if (session) await session.endSession();
+    }
 };

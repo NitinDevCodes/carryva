@@ -6,15 +6,19 @@ const safeReturnPath = require('../utils/safeReturnPath');
 
 router.get('/', async (req, res) => {
     let featuredProducts = [];
+    let newArrivals = [];
     let productError = null;
     try {
         featuredProducts = await Product.find({ isFeatured: true }).sort({ createdAt: -1, _id: -1 }).limit(4).lean();
+        newArrivals = await Product.find({ isNewCollection: true, _id: { $nin: featuredProducts.map((product) => product._id) } })
+            .sort({ createdAt: -1, _id: -1 }).limit(4).lean();
     } catch (error) {
         productError = 'Featured products are temporarily unavailable.';
     }
     res.render('index', {
         error: req.flash('error'),
         featuredProducts,
+        newArrivals,
         productError,
         returnTo: safeReturnPath(req.query.returnTo, ''),
     });

@@ -32,6 +32,7 @@ module.exports = async function isLoggedIn(req, res, next) {
         decoded = jwt.verify(token, JWT_KEY, {
             issuer: JWT_ISSUER,
             audience: JWT_AUDIENCE,
+            algorithms: ['HS256'],
         });
     } catch (error) {
         clearAuthCookie(res);
@@ -46,10 +47,15 @@ module.exports = async function isLoggedIn(req, res, next) {
     try {
         const user = await userModel
             .findOne({ _id: decoded.sub, email: decoded.email })
-            .select('-password');
+            .select('-password +authVersion');
         if (!user) {
             clearAuthCookie(res);
             return redirectToLogin(req, res, 'Please log in again.');
+        }
+
+        if ((decoded.ver ?? 0) !== (Number(user.authVersion) || 0)) {
+            clearAuthCookie(res);
+            return redirectToLogin(req, res, 'Your login has expired. Please log in again.');
         }
 
         req.user = user;

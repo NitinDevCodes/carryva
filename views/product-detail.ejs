@@ -1,64 +1,46 @@
 <%- include('./partials/header') %>
-<main class="min-h-screen px-6 py-20 md:px-20">
-    <div class="mx-auto max-w-6xl">
-        <a class="mb-6 inline-block underline" href="/shop">Back to products</a>
-        <% if (error) { %>
-            <p class="rounded bg-zinc-100 p-6 text-zinc-700"><%= error %></p>
-        <% } else { %>
-            <% const gallery = [{ data: product.image, contentType: product.imageContentType }, ...(product.images || [])]; %>
-            <% const salePrice = product.discountedPrice != null ? product.discountedPrice : product.price * (1 - (product.discount || 0) / 100); %>
-            <% const canAdd = (product.availability || 'in-stock') === 'in-stock' && (product.stockQuantity ?? 1) > 0; %>
-            <article class="overflow-hidden rounded-md border">
-                <div class="grid gap-4 bg-zinc-50 p-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <% gallery.forEach(function(image, index) { %>
-                        <div class="flex min-h-64 items-center justify-center rounded p-5" style="background-color: <%= product.bgColor || '#f4f4f4' %>">
-                            <img class="max-h-96 max-w-full object-contain" src="data:<%= image.contentType %>;base64,<%= image.data.toString('base64') %>" alt="<%= product.name %> — image <%= index + 1 %>">
-                        </div>
-                    <% }) %>
+<main id="main-content" class="product-detail-page shell">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/shop">Shop</a><span aria-hidden="true">/</span><span><%= product ? product.name : 'Product' %></span></nav>
+    <% if (error) { %><section class="empty-state page-alert" role="status"><p class="eyebrow">Carryva collection</p><h1><%= error %></h1><a class="button button-outline" href="/shop">Back to the collection</a></section>
+    <% } else { %>
+        <% const gallery = [{ data: product.image, contentType: product.imageContentType }, ...(product.images || [])]; %>
+        <% const salePrice = product.discountedPrice != null ? product.discountedPrice : product.price * (1 - (product.discount || 0) / 100); %>
+        <% const hasDiscount = salePrice < product.price; %>
+        <% const canAdd = (product.availability || 'in-stock') === 'in-stock' && (product.stockQuantity ?? 1) > 0; %>
+        <article class="product-detail-layout">
+            <section class="gallery-column" aria-label="Product images">
+                <div class="main-product-image">
+                    <div class="image-wash"></div>
+                    <img id="primary-product-image" src="data:<%= gallery[0].contentType %>;base64,<%= gallery[0].data.toString('base64') %>" alt="<%= product.name %>">
+                    <% if (hasDiscount) { %><span class="badge badge-sale detail-sale-badge"><%= Math.round((1 - salePrice / product.price) * 100) %>% off</span><% } %>
                 </div>
-                <div class="grid gap-8 p-6 md:grid-cols-2 md:p-10" style="background-color: <%= product.panelColor || '#ffffff' %>; color: <%= product.textColor || '#111827' %>">
-                    <section>
-                        <div class="mb-3 flex flex-wrap gap-2">
-                            <% if (product.isNewCollection) { %><span class="rounded bg-white px-2 py-1 text-xs text-black">New arrival</span><% } %>
-                            <% if (product.isFeatured) { %><span class="rounded bg-white px-2 py-1 text-xs text-black">Featured</span><% } %>
-                            <span class="rounded bg-white px-2 py-1 text-xs text-black"><%= (product.availability || 'in-stock') === 'in-stock' ? 'In stock' : (product.availability || 'out-of-stock') === 'preorder' ? 'Pre-order' : 'Out of stock' %></span>
-                        </div>
-                        <p class="mb-2 text-sm uppercase tracking-wide"><%= product.category || 'Other' %></p>
-                        <h1 class="text-3xl font-semibold"><%= product.name %></h1>
-                        <% if (salePrice < product.price) { %>
-                            <p class="mt-4 text-xl"><del>₹ <%= product.price.toFixed(2) %></del> <strong>₹ <%= salePrice.toFixed(2) %></strong> <span class="text-sm">(<%= product.discount || Math.round((1 - salePrice / product.price) * 100) %>% off)</span></p>
-                        <% } else { %>
-                            <p class="mt-4 text-xl">₹ <%= product.price.toFixed(2) %></p>
-                        <% } %>
-                        <% if (product.description) { %><p class="mt-6 whitespace-pre-line leading-relaxed"><%= product.description %></p><% } %>
-                        <form action="/cart/items/<%= product._id %>" method="post" class="mt-6 flex flex-wrap items-end gap-3">
-                            <label class="text-sm">Quantity
-                                <input name="quantity" type="number" value="1" min="1" max="<%= product.stockQuantity ?? 1 %>" <%= canAdd ? '' : 'disabled' %> class="mt-1 block w-24 rounded border p-2">
-                            </label>
-                            <button type="submit" <%= canAdd ? '' : 'disabled' %> class="rounded-full bg-zinc-900 px-6 py-3 text-white disabled:cursor-not-allowed disabled:opacity-40">Add to cart</button>
-                            <span class="text-sm"><%= canAdd ? `${product.stockQuantity ?? 1} available` : 'Currently unavailable' %></span>
-                        </form>
-                    </section>
-                    <section>
-                        <h2 class="mb-3 text-lg font-semibold">Product details</h2>
-                        <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                            <% if (product.material && product.material !== 'Not specified') { %><dt class="font-medium">Material</dt><dd><%= product.material %></dd><% } %>
-                            <% if (product.colour && product.colour !== 'Not specified') { %><dt class="font-medium">Colour</dt><dd><%= product.colour %></dd><% } %>
-                            <% if (product.dimensions) { %><dt class="font-medium">Dimensions</dt><dd><%= product.dimensions %></dd><% } %>
-                            <% if (product.capacity) { %><dt class="font-medium">Capacity</dt><dd><%= product.capacity %></dd><% } %>
-                            <% if (product.weight != null) { %><dt class="font-medium">Weight</dt><dd><%= product.weight %> g</dd><% } %>
-                            <dt class="font-medium">Availability</dt><dd><%= (product.availability || 'in-stock') === 'in-stock' ? `${product.stockQuantity ?? 'Available'} in stock` : (product.availability || 'out-of-stock') === 'preorder' ? 'Available for pre-order' : 'Currently unavailable' %></dd>
-                            <% if (product.warranty) { %><dt class="font-medium">Warranty</dt><dd><%= product.warranty %></dd><% } %>
-                        </dl>
-                        <% if ((product.features || []).length) { %>
-                            <h3 class="mb-2 mt-6 font-semibold">Compartments and features</h3>
-                            <ul class="list-inside list-disc space-y-1 text-sm"><% product.features.forEach(function(feature) { %><li><%= feature %></li><% }) %></ul>
-                        <% } %>
-                        <% if (product.careInstructions) { %><h3 class="mb-2 mt-6 font-semibold">Care instructions</h3><p class="whitespace-pre-line text-sm"><%= product.careInstructions %></p><% } %>
-                    </section>
-                </div>
-            </article>
-        <% } %>
-    </div>
+                <% if (gallery.length > 1) { %><div class="gallery-thumbnails" role="group" aria-label="Choose product image"><% gallery.forEach(function(image, index) { %>
+                    <button class="gallery-thumb <%= index === 0 ? 'is-active' : '' %>" type="button" data-gallery-src="data:<%= image.contentType %>;base64,<%= image.data.toString('base64') %>" data-gallery-alt="<%= product.name %>, image <%= index + 1 %>" aria-label="Show image <%= index + 1 %>" aria-pressed="<%= index === 0 ? 'true' : 'false' %>"><img src="data:<%= image.contentType %>;base64,<%= image.data.toString('base64') %>" alt=""></button>
+                <% }) %></div><% } %>
+            </section>
+            <section class="product-purchase-panel">
+                <p class="eyebrow eyebrow-accent"><%= product.category || 'Other' %><% if (product.isNewCollection) { %><span aria-hidden="true"> · </span>New arrival<% } %></p>
+                <h1><%= product.name %></h1>
+                <div class="detail-price"><% if (hasDiscount) { %><del>₹ <%= product.price.toFixed(2) %></del><% } %><strong>₹ <%= salePrice.toFixed(2) %></strong><% if (hasDiscount) { %><span class="badge badge-sale"><%= Math.round((1 - salePrice / product.price) * 100) %>% off</span><% } %></div>
+                <p class="detail-description"><%= product.description || 'A Carryva bag for everyday plans.' %></p>
+                <div class="availability-line"><span class="availability-dot <%= canAdd ? 'is-available' : 'is-unavailable' %>"></span><span><%= canAdd ? `${product.stockQuantity ?? 1} available` : (product.availability === 'preorder' ? 'Available for pre-order' : 'Currently unavailable') %></span></div>
+                <form action="/cart/items/<%= product._id %>" method="post" class="purchase-form">
+                    <label for="quantity">Quantity</label><div class="purchase-actions"><input id="quantity" name="quantity" type="number" value="1" min="1" max="<%= product.stockQuantity ?? 1 %>" <%= canAdd ? '' : 'disabled' %> required><button class="button button-dark" type="submit" <%= canAdd ? '' : 'disabled' %>>Add to bag</button></div>
+                </form>
+                <div class="detail-rule"></div>
+                <section class="details-section"><h2>Details</h2><dl class="product-spec-list">
+                    <dt>Category</dt><dd><%= product.category || 'Other' %></dd>
+                    <dt>Colour</dt><dd><%= product.colour && product.colour !== 'Not specified' ? product.colour : 'Not specified' %></dd>
+                    <dt>Material</dt><dd><%= product.material && product.material !== 'Not specified' ? product.material : 'Not specified' %></dd>
+                    <dt>Dimensions</dt><dd><%= product.dimensions || 'Not specified' %></dd>
+                    <dt>Capacity</dt><dd><%= product.capacity || 'Not specified' %></dd>
+                    <dt>Weight</dt><dd><%= product.weight != null ? `${product.weight} g` : 'Not specified' %></dd>
+                    <dt>Availability</dt><dd><%= (product.availability || 'in-stock') === 'in-stock' ? 'In stock' : (product.availability === 'preorder' ? 'Pre-order' : 'Out of stock') %></dd>
+                </dl></section>
+                <% if ((product.features || []).length) { %><section class="details-section"><h2>Features</h2><ul class="feature-list"><% product.features.forEach(function(feature) { %><li><span aria-hidden="true">✳</span><%= feature %></li><% }) %></ul></section><% } %>
+                <% if (product.careInstructions || product.warranty) { %><details class="care-details"><summary>Care &amp; warranty information</summary><div><% if (product.careInstructions) { %><p><strong>Care:</strong> <%= product.careInstructions %></p><% } %><% if (product.warranty) { %><p><strong>Warranty:</strong> <%= product.warranty %></p><% } %></div></details><% } %>
+            </section>
+        </article>
+    <% } %>
 </main>
 <%- include('./partials/footer') %>

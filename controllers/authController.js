@@ -1,7 +1,11 @@
 const userModel = require('../models/user-model');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { generateToken } = require('../utils/generateToken');
 const {
+    JWT_KEY,
+    JWT_ISSUER,
+    JWT_AUDIENCE,
     AUTH_COOKIE_NAME,
     AUTH_COOKIE_OPTIONS,
 } = require('../config/keys');
@@ -26,15 +30,15 @@ function logAuthFailure(operation, error) {
 
     if (error && error.name === 'ValidationError') {
         details.paths = Object.keys(error.errors || {});
-    } else if (error && /^Mongo/.test(error.name) && error.message) {
-        // Mongo messages help diagnose outages/configuration. Redact URI
-        // credentials; do not log arbitrary errors that may contain input.
-        details.message = String(error.message)
-            .replace(/(mongodb(?:\+srv)?:\/\/)[^\s@]+@/gi, '$1[redacted]@')
-            .slice(0, 400);
     }
 
     console.error(`[auth] ${operation} failed`, details);
+}
+
+function regenerateSession(req) {
+    return new Promise((resolve, reject) => {
+        req.session.regenerate((error) => error ? reject(error) : resolve());
+    });
 }
 
 module.exports.registerUser = async (req, res) => {
@@ -50,6 +54,7 @@ module.exports.registerUser = async (req, res) => {
     }
 
     try {
+        await regenerateSession(req);
         const existingUser = await userModel.findOne({ email }).select('_id');
         if (existingUser) return res.status(409).send('Account already exists.');
 
@@ -82,11 +87,12 @@ module.exports.loginUser = async (req, res) => {
     }
 
     try {
-        const user = await userModel.findOne({ email }).select('+password');
+        const user = await userModel.findOne({ email }).select('+password +authVersion');
         if (!user || !(await bcrypt.compare(password, user.password))) {
             return res.status(401).send('Email or password is wrong.');
         }
 
+        await regenerateSession(req);
         res.cookie(AUTH_COOKIE_NAME, generateToken(user), AUTH_COOKIE_OPTIONS);
         return res.redirect(safeReturnPath(body.returnTo, user.role === 'owner' ? '/owners/admin' : '/shop'));
     } catch (error) {
@@ -95,7 +101,7 @@ module.exports.loginUser = async (req, res) => {
     }
 };
 
-module.exports.logout = (req, res, next) => {
+module.exports.logout = async (req, res, next) => {
     const finishLogout = () => {
         res.clearCookie(AUTH_COOKIE_NAME, authCookieClearOptions());
         res.clearCookie('carryva.sid', {
@@ -107,9 +113,29 @@ module.exports.logout = (req, res, next) => {
         return res.redirect('/');
     };
 
+    const token = req.cookies && req.cookies[AUTH_COOKIE_NAME];
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, JWT_KEY, {
+                issuer: JWT_ISSUER,
+                audience: JWT_AUDIENCE,
+                algorithms: ['HS256'],
+            });
+            if (decoded.sub && decoded.email) {
+                const version = Number.isSafeInteger(decoded.ver) ? decoded.ver : 0;
+                await userModel.updateOne({
+                    _id: decoded.sub,
+                    email: decoded.email,
+                    $or: [{ authVersion: version }, { authVersion: { $exists: false } }],
+                }, { $inc: { authVersion: 1 } });
+            }
+        } catch (error) {
+            if (!['JsonWebTokenError', 'TokenExpiredError', 'NotBeforeError'].includes(error.name)) {
+                logAuthFailure('logout revocation', error);
+            }
+        }
+    }
+
     if (!req.session) return finishLogout();
-    req.session.destroy((error) => {
-        if (error) return next(error);
-        return finishLogout();
-    });
+    req.session.destroy((error) => error ? next(error) : finishLogout());
 };

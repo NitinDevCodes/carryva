@@ -1,63 +1,32 @@
 <%- include('./partials/header') %>
-<main class="min-h-screen w-full px-6 py-20 md:px-20">
-    <div class="mx-auto flex max-w-7xl flex-col gap-8 md:flex-row">
-        <aside class="w-full shrink-0 md:w-1/4">
-            <form action="/shop" method="get" class="mb-8">
+<main id="main-content" class="shop-page shell">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>Shop</span></nav>
+    <div class="shop-heading"><div><p class="eyebrow eyebrow-accent">The Carryva collection</p><h1>Bags to go with you</h1><p class="shop-subtitle">An easy edit of bags for workdays, weekends, and everything between.</p></div><p class="result-count"><%= products.length %> <%= products.length === 1 ? 'style' : 'styles' %><% if (category) { %> · <%= category %><% } %></p></div>
+    <% if (error) { %><p class="page-alert page-alert-error" role="alert"><%= error %></p><% } %>
+    <div class="shop-layout">
+        <aside class="shop-sidebar" aria-label="Shop filters">
+            <div class="filter-block"><h2>Collections</h2><nav class="filter-links" aria-label="Collections">
+                <a class="<%= filter === 'all' && !category ? 'is-current' : '' %>" href="/shop">All bags <span>→</span></a>
+                <a class="<%= filter === 'new' ? 'is-current' : '' %>" href="/shop?filter=new<%= category ? `&category=${encodeURIComponent(category)}` : '' %>">New arrivals <span>→</span></a>
+                <a class="<%= filter === 'discounted' ? 'is-current' : '' %>" href="/shop?filter=discounted<%= category ? `&category=${encodeURIComponent(category)}` : '' %>">The edit <span>→</span></a>
+            </nav></div>
+            <% if (categories.length) { %><div class="filter-block"><h2>Shop by type</h2><nav class="filter-links" aria-label="Categories">
+                <% categories.forEach(function(item) { %><a class="<%= category === item ? 'is-current' : '' %>" href="/shop?category=<%= encodeURIComponent(item) %><%= filter !== 'all' ? `&filter=${encodeURIComponent(filter)}` : '' %>"><%= item %><span>→</span></a><% }) %>
+            </nav></div><% } %>
+            <form action="/shop" method="get" class="sort-form">
                 <% if (filter !== 'all') { %><input type="hidden" name="filter" value="<%= filter %>"><% } %>
-                <label for="sortby" class="mr-2">Sort by</label>
-                <select class="border px-2 py-1" name="sortby" id="sortby" onchange="this.form.submit()">
-                    <option value="newest" <%= sortby === 'newest' ? 'selected' : '' %>>Newest</option>
+                <% if (category) { %><input type="hidden" name="category" value="<%= category %>"><% } %>
+                <label for="sortby">Sort by</label>
+                <select name="sortby" id="sortby" data-auto-submit>
+                    <option value="newest" <%= sortby === 'newest' ? 'selected' : '' %>>Recently added</option>
                     <option value="price-low" <%= sortby === 'price-low' ? 'selected' : '' %>>Price: low to high</option>
                     <option value="price-high" <%= sortby === 'price-high' ? 'selected' : '' %>>Price: high to low</option>
                 </select>
             </form>
-            <nav class="flex flex-col gap-2">
-                <a href="/shop?filter=new">New Collection</a>
-                <a href="/shop">All Products</a>
-                <a href="/shop?filter=discounted">Discounted Products</a>
-            </nav>
         </aside>
-        <section class="w-full md:w-3/4" aria-live="polite">
-            <% if (error) { %>
-                <p class="rounded bg-red-100 p-4 text-red-800"><%= error %></p>
-            <% } else if (products.length === 0) { %>
-                <p class="rounded bg-zinc-100 p-6 text-zinc-700">No products match this view yet.</p>
-            <% } else { %>
-                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                    <% products.forEach(function(product) { %>
-                        <% const salePrice = product.discountedPrice != null ? product.discountedPrice : product.price * (1 - (product.discount || 0) / 100); %>
-                        <% const canAdd = (product.availability || 'in-stock') === 'in-stock' && (product.stockQuantity ?? 1) > 0; %>
-                        <article class="overflow-hidden rounded-md border">
-                        <a class="block" href="/products/<%= product._id %>">
-                            <div class="flex h-52 items-center justify-center" style="background-color: <%= product.bgColor || '#f4f4f4' %>">
-                                <img class="h-48 max-w-full object-contain" src="data:<%= product.imageContentType %>;base64,<%= product.image.toString('base64') %>" alt="<%= product.name %>">
-                            </div>
-                            <div class="flex items-start justify-between gap-3 px-4 py-4" style="background-color: <%= product.panelColor || '#ffffff' %>; color: <%= product.textColor || '#111827' %>">
-                                <div>
-                                    <h2 class="font-medium"><%= product.name %></h2>
-                                    <% if (salePrice < product.price) { %>
-                                        <p><del>₹ <%= product.price.toFixed(2) %></del> <strong>₹ <%= salePrice.toFixed(2) %></strong></p>
-                                    <% } else { %>
-                                        <p>₹ <%= product.price.toFixed(2) %></p>
-                                    <% } %>
-                                    <p class="mt-1 text-sm"><%= product.category || 'Other' %><% if (product.colour && product.colour !== 'Not specified') { %> · <%= product.colour %><% } %></p>
-                                    <% if (product.description) { %><p class="mt-2 line-clamp-2 text-sm"><%= product.description %></p><% } %>
-                                </div>
-                                <div class="flex shrink-0 flex-col items-end gap-1">
-                                    <% if (product.isNewCollection) { %><span class="rounded bg-white px-2 py-1 text-xs text-black">New</span><% } %>
-                                    <% if (product.isFeatured) { %><span class="rounded bg-white px-2 py-1 text-xs text-black">Featured</span><% } %>
-                                </div>
-                            </div>
-                        </a>
-                        <form action="/cart/items/<%= product._id %>" method="post" class="flex items-center justify-between border-t p-3">
-                            <span class="text-xs text-zinc-600"><%= canAdd ? `${product.stockQuantity ?? 1} available` : 'Unavailable' %></span>
-                            <input type="hidden" name="quantity" value="1">
-                            <button type="submit" <%= canAdd ? '' : 'disabled' %> class="rounded-full bg-zinc-900 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40">Add to cart</button>
-                        </form>
-                        </article>
-                    <% }) %>
-                </div>
-            <% } %>
+        <section class="shop-results" aria-live="polite" aria-label="Products">
+            <% if (!error && products.length === 0) { %><div class="empty-state"><p class="eyebrow">Nothing here yet</p><h2>No bags match this selection.</h2><p>No products match this view yet. Try another collection or browse all bags.</p><a class="button button-outline" href="/shop">View all bags</a></div>
+            <% } else if (products.length) { %><div class="product-grid"><% products.forEach(function(product) { %><%- include('./partials/product-card', { product }) %><% }) %></div><% } %>
         </section>
     </div>
 </main>

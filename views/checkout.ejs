@@ -1,54 +1,29 @@
 <%- include('./partials/header') %>
-<main class="min-h-screen px-5 pb-16 pt-24 md:px-10">
-    <div class="mx-auto max-w-6xl">
-        <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
-            <div><p class="text-sm uppercase tracking-wide text-zinc-500">Almost yours</p><h1 class="text-3xl font-semibold">Checkout</h1></div>
-            <a href="/cart" class="underline">Back to cart</a>
-        </div>
-        <% if (error) { %><p role="alert" class="mb-5 rounded bg-red-100 p-4 text-red-800"><%= error %></p><% } %>
-        <% if (cartItems.length) { %>
-        <form action="/checkout/place" method="post" class="grid gap-8 lg:grid-cols-[1fr_22rem]">
+<main id="main-content" class="page-shell shell">
+    <div class="page-heading"><div><p class="eyebrow">Almost yours</p><h1>Checkout</h1><p>Share your delivery details to complete your order.</p></div><a class="inline-link" href="/cart">Back to your bag</a></div>
+    <% if (error) { %><p role="alert" class="page-alert page-alert-error"><%= error %></p><% } %>
+    <% if (cartItems.length) { %>
+        <form action="/checkout/place" method="post" class="checkout-layout">
             <input type="hidden" name="idempotencyKey" value="<%= checkoutKey %>">
-            <section class="rounded-lg border bg-white p-5 sm:p-8">
-                <h2 class="text-xl font-semibold">Delivery details</h2>
-                <p class="mt-1 text-sm text-zinc-600">Where should we deliver your Carryva bag?</p>
-                <div class="mt-6 grid gap-4 sm:grid-cols-2">
-                    <label class="text-sm">Customer name<input class="mt-1 block w-full rounded border px-3 py-2" name="customerName" value="<%= values.customerName || user.fullName %>" minlength="3" maxlength="80" autocomplete="name" required></label>
-                    <label class="text-sm">Phone number<input class="mt-1 block w-full rounded border px-3 py-2" name="phone" value="<%= values.phone || '' %>" type="tel" inputmode="tel" autocomplete="tel" required></label>
-                    <label class="text-sm sm:col-span-2">Delivery address<textarea class="mt-1 block w-full rounded border px-3 py-2" name="address" rows="3" minlength="5" maxlength="300" autocomplete="street-address" required><%= values.address || '' %></textarea></label>
-                    <label class="text-sm">City<input class="mt-1 block w-full rounded border px-3 py-2" name="city" value="<%= values.city || '' %>" maxlength="80" autocomplete="address-level2" required></label>
-                    <label class="text-sm">State<input class="mt-1 block w-full rounded border px-3 py-2" name="state" value="<%= values.state || '' %>" maxlength="80" autocomplete="address-level1" required></label>
-                    <label class="text-sm">Postal code<input class="mt-1 block w-full rounded border px-3 py-2" name="postalCode" value="<%= values.postalCode || '' %>" maxlength="12" autocomplete="postal-code" required></label>
-                </div>
-                <fieldset class="mt-8 rounded border p-4">
-                    <legend class="px-2 font-medium">Payment method</legend>
-                    <label class="flex cursor-pointer items-start gap-3"><input type="radio" name="paymentMethod" value="cash-on-delivery" checked required><span><strong class="block">Cash on delivery</strong><span class="text-sm text-zinc-600">Pay when your order arrives. No online payment has been taken.</span></span></label>
-                </fieldset>
-            </section>
-            <aside class="h-fit rounded-lg border bg-white p-5 sm:p-6">
-                <h2 class="text-lg font-semibold">Order summary</h2>
-                <ul class="mt-4 divide-y">
-                    <% cartItems.forEach(function(item) { %>
-                    <li class="flex gap-3 py-3">
-                        <img class="h-16 w-16 rounded bg-zinc-50 object-contain p-1" src="data:<%= item.imageContentType %>;base64,<%= item.image.toString('base64') %>" alt="">
-                        <div class="min-w-0 flex-1"><p class="truncate font-medium"><%= item.name %></p><p class="text-sm text-zinc-600">Qty <%= item.quantity %> · ₹ <%= item.unitPrice.toFixed(2) %> each</p></div>
-                        <strong class="whitespace-nowrap">₹ <%= item.lineTotal.toFixed(2) %></strong>
-                    </li>
-                    <% }) %>
-                </ul>
-                <dl class="mt-4 space-y-3 border-t pt-4 text-sm">
-                    <div class="flex justify-between"><dt>Subtotal</dt><dd>₹ <%= totals.subtotal.toFixed(2) %></dd></div>
-                    <div class="flex justify-between text-green-700"><dt>Discount</dt><dd>− ₹ <%= totals.discount.toFixed(2) %></dd></div>
-                    <div class="flex justify-between"><dt>Delivery</dt><dd><%= totals.deliveryFee === 0 ? 'Free' : `₹ ${totals.deliveryFee.toFixed(2)}` %></dd></div>
-                    <div class="flex justify-between border-t pt-3 text-base font-semibold"><dt>Total due on delivery</dt><dd>₹ <%= totals.total.toFixed(2) %></dd></div>
-                </dl>
-                <button class="mt-6 w-full rounded-full bg-zinc-900 px-5 py-3 font-medium text-white">Place order</button>
-                <p class="mt-3 text-xs leading-relaxed text-zinc-500">Stock and current prices are verified when you place the order.</p>
+            <div class="checkout-form">
+                <section class="form-card"><h2>Delivery details</h2><p class="form-hint">Where should we deliver your Carryva bag?</p>
+                    <div class="field-grid">
+                        <label class="field-label">Customer name<input name="customerName" value="<%= values.customerName || user.fullName %>" minlength="3" maxlength="80" autocomplete="name" required></label>
+                        <label class="field-label">Phone number<input name="phone" value="<%= values.phone || '' %>" type="tel" inputmode="tel" autocomplete="tel" required></label>
+                        <label class="field-label field-span">Delivery address<textarea name="address" rows="3" minlength="5" maxlength="300" autocomplete="street-address" required><%= values.address || '' %></textarea></label>
+                        <label class="field-label">City<input name="city" value="<%= values.city || '' %>" maxlength="80" autocomplete="address-level2" required></label>
+                        <label class="field-label">State<input name="state" value="<%= values.state || '' %>" maxlength="80" autocomplete="address-level1" required></label>
+                        <label class="field-label">Postal code<input name="postalCode" value="<%= values.postalCode || '' %>" maxlength="12" autocomplete="postal-code" required></label>
+                    </div>
+                    <fieldset class="payment-fieldset"><legend>Payment method</legend><label class="payment-choice"><input type="radio" name="paymentMethod" value="cash-on-delivery" checked required><span><strong>Cash on delivery</strong><span>Pay when your order arrives. No online payment has been taken.</span></span></label></fieldset>
+                </section>
+            </div>
+            <aside class="summary-card"><h2>Order summary</h2><ul class="checkout-items">
+                <% cartItems.forEach(function(item) { %><li class="checkout-item"><img src="data:<%= item.imageContentType %>;base64,<%= item.image.toString('base64') %>" alt=""><div><strong><%= item.name %></strong><p>Qty <%= item.quantity %> · ₹ <%= item.unitPrice.toFixed(2) %> each</p></div><strong>₹ <%= item.lineTotal.toFixed(2) %></strong></li><% }) %>
+            </ul><dl class="summary-lines"><div><dt>Subtotal</dt><dd>₹ <%= totals.subtotal.toFixed(2) %></dd></div><div class="discount-line"><dt>Discount</dt><dd>− ₹ <%= totals.discount.toFixed(2) %></dd></div><div><dt>Delivery</dt><dd><%= totals.deliveryFee === 0 ? 'Free' : `₹ ${totals.deliveryFee.toFixed(2)}` %></dd></div><div class="summary-total"><dt>Total due on delivery</dt><dd>₹ <%= totals.total.toFixed(2) %></dd></div></dl>
+                <button class="button button-dark cart-checkout-button" type="submit">Place order</button><p class="summary-note">Stock and current prices are verified when you place the order.</p>
             </aside>
         </form>
-        <% } else { %>
-            <section class="rounded-lg border bg-white p-10 text-center"><h2 class="text-xl font-medium">Checkout is unavailable</h2><p class="mt-2 text-zinc-600">Add an available bag to your cart before placing an order.</p><a href="/shop" class="mt-6 inline-block rounded-full bg-zinc-900 px-6 py-3 text-white">Browse bags</a></section>
-        <% } %>
-    </div>
+    <% } else { %><section class="empty-state"><p class="eyebrow">Your bag is waiting</p><h2>Checkout is unavailable</h2><p>Add an available bag to your cart before placing an order.</p><a href="/shop" class="button button-dark">Browse bags</a></section><% } %>
 </main>
 <%- include('./partials/footer') %>
