@@ -8,6 +8,9 @@ process.env.JWT_KEY = crypto.randomBytes(48).toString('base64url');
 process.env.EXPRESS_SESSION_SECRET = crypto.randomBytes(48).toString('base64url');
 process.env.MONGODB_URI = process.env.CARRYVA_TEST_MONGODB_URI || 'mongodb://127.0.0.1:27017';
 process.env.MONGODB_DB = `carryva_auth_test_${process.pid}`;
+// This suite covers authentication behavior across many requests from one test
+// client; the configured limiter is exercised independently in the deployment suite.
+process.env.AUTH_RATE_LIMIT_MAX = '100';
 
 const app = require('../app');
 const bcrypt = require('bcrypt');

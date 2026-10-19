@@ -3,7 +3,27 @@ const Product = require('../models/product-model');
 
 const maxImagePixels = 40000000;
 const maxProductImages = 6;
-const maxProductImageBytes = 20 * 1024 * 1024;
+const maxBsonDocumentBytes = 16 * 1024 * 1024;
+const reservedProductDocumentBytes = 4 * 1024 * 1024;
+const maxProductImageDataUriBytes = maxBsonDocumentBytes - reservedProductDocumentBytes;
+const dataUriPrefix = (contentType) => `data:${contentType};base64,`;
+
+function productImageDataUriBytes(file) {
+    if (!Number.isSafeInteger(file?.size) || file.size < 0 || typeof file.mimetype !== 'string') return Infinity;
+    return 4 * Math.ceil(file.size / 3) + Buffer.byteLength(dataUriPrefix(file.mimetype));
+}
+
+function validateProductImageSize(files) {
+    const dataUriBytes = files.reduce((total, file) => total + productImageDataUriBytes(file), 0);
+    if (dataUriBytes > maxProductImageDataUriBytes) {
+        return 'Combined product images are too large. Their base64 display size must be 12 MiB or less to leave room under MongoDB’s 16 MiB document limit.';
+    }
+    return null;
+}
+
+function isBsonDocumentTooLarge(error) {
+    return error?.code === 10334 || error?.codeName === 'BSONObjectTooLarge';
+}
 
 function dimensionsAreSafe(width, height) {
     return width > 0 && height > 0 && width <= 12000 && height <= 12000 && width * height <= maxImagePixels;
@@ -136,7 +156,8 @@ function productInput(body, files, existing) {
     if (features.length > 20 || features.some((feature) => feature.length < 2 || feature.length > 120)) return { error: 'Add up to 20 features, each no longer than 120 characters.' };
     if (files.length > maxProductImages) return { error: `Upload no more than ${maxProductImages} product images.` };
     if (files.some((file) => !hasValidImage(file))) return { error: 'An uploaded file does not match a supported image type.' };
-    if (files.reduce((sum, file) => sum + file.size, 0) > maxProductImageBytes) return { error: 'Product images must total 20 MB or less.' };
+    const imageSizeError = validateProductImageSize(files);
+    if (imageSizeError) return { error: imageSizeError, status: 413 };
     if (!files.length && !existing) return { error: 'Please select at least one JPEG, PNG, or WebP product image.' };
 
     const imageUpdates = files.length ? {
@@ -255,12 +276,13 @@ module.exports.showEditForm = async (req, res) => {
 
 module.exports.createProduct = async (req, res) => {
     const input = productInput(req.body || {}, productImages(req), null);
-    if (input.error) return res.status(400).send(input.error);
+    if (input.error) return res.status(input.status || 400).send(input.error);
     try {
         await Product.create(input.value);
         req.flash('success', 'Product created successfully.');
         return res.redirect('/owners/admin');
     } catch (error) {
+        if (isBsonDocumentTooLarge(error)) return res.status(413).send('Product data exceeds MongoDB’s 16 MiB document limit. Reduce the image or text content and try again.');
         if (error.name === 'ValidationError') return res.status(400).send('Please check the product details and try again.');
         return res.status(500).send('Unable to create this product right now.');
     }
@@ -272,17 +294,22 @@ module.exports.updateProduct = async (req, res) => {
         const existing = await Product.findById(req.params.id);
         if (!existing) return notFoundProduct(res);
         const input = productInput(req.body || {}, productImages(req), existing);
-        if (input.error) return res.status(400).send(input.error);
+        if (input.error) return res.status(input.status || 400).send(input.error);
 
         Object.assign(existing, input.value);
         await existing.save();
         req.flash('success', 'Product updated successfully.');
         return res.redirect('/owners/admin');
     } catch (error) {
+        if (isBsonDocumentTooLarge(error)) return res.status(413).send('Product data exceeds MongoDB’s 16 MiB document limit. Reduce the image or text content and try again.');
         if (error.name === 'ValidationError') return res.status(400).send('Please check the product details and try again.');
         return res.status(500).send('Unable to update this product right now.');
     }
 };
+
+module.exports.validateProductImageSize = validateProductImageSize;
+module.exports.maxProductImageDataUriBytes = maxProductImageDataUriBytes;
+module.exports.productImageDataUriBytes = productImageDataUriBytes;
 
 module.exports.deleteProduct = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return notFoundProduct(res);

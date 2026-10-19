@@ -1,4 +1,6 @@
-require('dotenv').config({ override: process.env.NODE_ENV !== 'production' });
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config({ override: true });
+}
 
 const JWT_KEY = process.env.JWT_KEY;
 const SESSION_SECRET = process.env.EXPRESS_SESSION_SECRET;

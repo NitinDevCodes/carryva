@@ -59,6 +59,10 @@ after(async () => {
 test('standalone MongoDB rejects checkout and cancellation without partial writes', async (context) => {
     if (mongoose.connection.supportsTransactions) return context.skip('Configured MongoDB supports transactions; standalone safety path is not applicable.');
 
+    const readiness = await fetch(`${baseUrl}/health/ready`);
+    assert.equal(readiness.status, 503);
+    assert.deepEqual(await readiness.json(), { status: 'not_ready' });
+
     const customerCookie = `token=${generateToken(customer)}`;
     const checkout = await fetch(`${baseUrl}/checkout/place`, {
         method: 'POST',

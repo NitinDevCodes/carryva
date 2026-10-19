@@ -1,4 +1,8 @@
-require('dotenv').config({ override: process.env.NODE_ENV !== 'production' });
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config({ override: true });
+}
+const { validateEnvironment } = require('./config/environment');
+const runtimeConfig = validateEnvironment(process.env);
 
 const express = require('express');
 const app = express();
@@ -15,20 +19,27 @@ const MongoStore = require('connect-mongo').default;
 const flash = require('connect-flash');
 const { SESSION_SECRET } = require('./config/keys');
 const { setSecurityHeaders, sameOriginWrites } = require('./middlewares/security');
+const { isApplicationReady } = require('./utils/readiness');
 
 const db = require('./config/mongoose-connection');
 
 app.disable('x-powered-by');
 const proxyHops = process.env.TRUST_PROXY_HOPS;
 if (proxyHops) {
-    if (!/^\d+$/.test(proxyHops) || Number(proxyHops) < 1 || Number(proxyHops) > 10) {
-        throw new Error('TRUST_PROXY_HOPS must be a whole number from 1 to 10.');
-    }
     app.set('trust proxy', Number(proxyHops));
 }
 
 // Middleware
 app.use(setSecurityHeaders);
+app.get('/health/live', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ status: 'alive' });
+});
+app.get('/health/ready', (req, res) => {
+    const ready = isApplicationReady(db);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'not_ready' });
+});
 app.use(express.json({ limit: '64kb' }));
 app.use(express.urlencoded({ extended: false, limit: '64kb', parameterLimit: 100 }));
 app.use(cookieParser());
@@ -83,7 +94,7 @@ app.use((error, req, res, next) => {
         : status === 400 ? 'Request could not be processed.' : 'The request could not be completed.');
 });
 
-const port = Number(process.env.PORT) || 3000;
+const port = runtimeConfig.port;
 async function start() {
     try {
         await db.ready;

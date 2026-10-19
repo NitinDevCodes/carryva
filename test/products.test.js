@@ -17,6 +17,7 @@ const mongoose = require('mongoose');
 const Product = require('../models/product-model');
 const User = require('../models/user-model');
 const { promoteOwner } = require('../scripts/promote-owner');
+const { validateProductImageSize, maxProductImageDataUriBytes, productImageDataUriBytes } = require('../controllers/productsController');
 const server = app.listen(0);
 
 let baseUrl;
@@ -26,6 +27,17 @@ let createdProduct;
 let secondProduct;
 
 const pngBytes = fs.readFileSync(path.join(__dirname, '..', 'public', 'images', '1bag.png'));
+
+function pngPayloadOfSize(size) {
+    const buffer = Buffer.alloc(size);
+    buffer.set([137, 80, 78, 71, 13, 10, 26, 10], 0);
+    buffer.write('IHDR', 12, 'ascii');
+    buffer.writeUInt32BE(1, 16);
+    buffer.writeUInt32BE(1, 20);
+    buffer.write('IDAT', 25, 'ascii');
+    buffer.write('IEND', size - 4, 'ascii');
+    return buffer;
+}
 
 async function createUser(email, role) {
     const password = await bcrypt.hash('test-password-strong', 10);
@@ -356,6 +368,31 @@ test('legacy products without the expanded catalog fields still render on the sh
     assert.match(body, /₹ 60\.00/);
     assert.equal((body.match(/data:image\/png;base64,/g) || []).length, 1);
     await Product.collection.deleteOne({ _id: legacyId });
+});
+
+test('product image limits account for base64 data URIs and leave BSON document headroom', async () => {
+    const moderateFiles = [
+        { size: 4_400_000, mimetype: 'image/png' },
+        { size: 4_400_000, mimetype: 'image/png' },
+    ];
+    assert.ok(moderateFiles.reduce((sum, file) => sum + productImageDataUriBytes(file), 0) <= maxProductImageDataUriBytes);
+    assert.equal(validateProductImageSize(moderateFiles), null);
+
+    const oversizedFiles = [
+        { size: 4_800_000, mimetype: 'image/png' },
+        { size: 4_800_000, mimetype: 'image/png' },
+    ];
+    assert.match(validateProductImageSize(oversizedFiles), /MongoDB.*16 MiB document limit/i);
+});
+
+test('owner upload returns a clear 413 before saving images above the encoded-size budget', async () => {
+    const oversized = await sendProduct('/products/create', validFields({ name: 'Oversized Image Pair' }), ownerCookie, [
+        { bytes: pngPayloadOfSize(4_800_000), type: 'image/png', name: 'large-one.png' },
+        { bytes: pngPayloadOfSize(4_800_000), type: 'image/png', name: 'large-two.png' },
+    ]);
+    assert.equal(oversized.status, 413);
+    assert.match(await oversized.text(), /base64 display size.*MongoDB.*16 MiB/i);
+    assert.equal(await Product.countDocuments({ name: 'Oversized Image Pair' }), 0);
 });
 
 test('owner promotion updates an existing account through the database-only setup helper', async () => {

@@ -1,4 +1,6 @@
-require('dotenv').config({ override: process.env.NODE_ENV !== 'production' });
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config({ override: true });
+}
 
 const mongoose = require('mongoose');
 const User = require('../models/user-model');
@@ -19,7 +21,9 @@ async function main() {
     const email = process.argv[2];
     if (!email) throw new Error('Usage: npm run owner:promote -- user@example.com');
     const development = require('../config/development.json');
-    await mongoose.connect(process.env.MONGODB_URI || development.MONG_URI, {
+    const mongoUri = process.env.MONGODB_URI || (process.env.NODE_ENV === 'production' ? '' : development.MONG_URI);
+    if (!mongoUri) throw new Error('MONGODB_URI is required in production.');
+    await mongoose.connect(mongoUri, {
         dbName: process.env.MONGODB_DB || 'Carryva',
     });
 

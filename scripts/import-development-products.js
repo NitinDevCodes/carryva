@@ -1,4 +1,6 @@
-require('dotenv').config({ override: process.env.NODE_ENV !== 'production' });
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config({ override: true });
+}
 
 const crypto = require('node:crypto');
 const fs = require('node:fs');

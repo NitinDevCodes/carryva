@@ -6,6 +6,10 @@ const path = require('path');
 function getMongoUri() {
     if (process.env.MONGODB_URI) return process.env.MONGODB_URI;
 
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('MONGODB_URI is required in production.');
+    }
+
     const configPath = path.join(__dirname, 'development.json');
     if (fs.existsSync(configPath)) {
         const development = JSON.parse(fs.readFileSync(configPath, 'utf8'));
