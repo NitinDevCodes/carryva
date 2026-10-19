@@ -35,6 +35,18 @@ function postForm(path, fields, cookie) {
     });
 }
 
+function formInputNames(html, action) {
+    const escapedAction = action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const form = html.match(new RegExp(`<form\\b[^>]*action=["']${escapedAction}["'][^>]*>([\\s\\S]*?)<\\/form>`, 'i'));
+    assert.ok(form, `expected a form posting to ${action}`);
+    return [...form[1].matchAll(/\bname=["']([^"']+)["']/gi)].map((match) => match[1]);
+}
+
+function browserFormData(names, values) {
+    assert.deepEqual([...names].sort(), Object.keys(values).sort());
+    return Object.fromEntries(names.map((name) => [name, values[name]]));
+}
+
 function cookieValue(response, cookieName = 'token') {
     const cookie = response.headers.getSetCookie().find((value) => value.startsWith(`${cookieName}=`));
     assert.ok(cookie, `expected ${cookieName} cookie`);
@@ -75,6 +87,7 @@ test('public shop and product listings load; owner operations reject requests wi
 test('registration validates input and rejects malformed or weak credentials', async () => {
     const missing = await postForm('/users/register', {});
     assert.equal(missing.status, 400);
+    assert.match(await missing.text(), /valid email|password/i);
 
     const badEmail = await postForm('/users/register', {
         ...credentials,
@@ -96,7 +109,19 @@ test('registration validates input and rejects malformed or weak credentials', a
 });
 
 test('registration hashes the password, signs an expiring token, and permits protected access', async () => {
-    const response = await postForm('/users/register', credentials);
+    const page = await fetch(`${baseUrl}/`);
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    const registerNames = formInputNames(html, '/users/register');
+    assert.deepEqual([...registerNames].sort(), ['email', 'fullName', 'password', 'returnTo']);
+    const registration = browserFormData(registerNames, {
+        fullName: credentials.fullName,
+        email: credentials.email,
+        password: credentials.password,
+        returnTo: '/shop',
+    });
+
+    const response = await postForm('/users/register', registration);
     assert.equal(response.status, 302);
     assert.equal(response.headers.get('location'), '/shop');
 
@@ -130,12 +155,25 @@ test('registration hashes the password, signs an expiring token, and permits pro
     assert.equal(protectedPage.status, 200);
 });
 
+test('registration ignores forged role fields', async () => {
+    const response = await postForm('/users/register', {
+        fullName: 'Forged Role User',
+        email: 'forged-role@example.com',
+        password: 'correct-horse-battery',
+        role: 'owner',
+    });
+    assert.equal(response.status, 302);
+    const user = await User.findOne({ email: 'forged-role@example.com' });
+    assert.equal(user.role, 'customer');
+});
+
 test('registration handles normalized duplicate emails', async () => {
     const response = await postForm('/users/register', {
         ...credentials,
         email: ' AUTH-TEST@EXAMPLE.COM ',
     });
     assert.equal(response.status, 409);
+    assert.match(await response.text(), /account already exists/i);
 });
 
 test('login rejects invalid credentials and authenticates the registered user', async () => {
@@ -154,10 +192,15 @@ test('login rejects invalid credentials and authenticates the registered user', 
     });
     assert.equal(unknownUser.status, 401);
 
-    const successfulLogin = await postForm('/users/login', {
+    const page = await fetch(`${baseUrl}/`);
+    const loginNames = formInputNames(await page.text(), '/users/login');
+    assert.deepEqual([...loginNames].sort(), ['email', 'password', 'returnTo']);
+    const loginData = browserFormData(loginNames, {
         email: credentials.email.toUpperCase(),
         password: credentials.password,
+        returnTo: '/shop',
     });
+    const successfulLogin = await postForm('/users/login', loginData);
     assert.equal(successfulLogin.status, 302);
     assert.equal(successfulLogin.headers.get('location'), '/shop');
     assert.ok(tokenCookie(successfulLogin));

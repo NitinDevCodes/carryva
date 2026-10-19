@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/user-model');
+const safeReturnPath = require('../utils/safeReturnPath');
 const {
     JWT_KEY,
     JWT_ISSUER,
@@ -13,11 +14,17 @@ const clearAuthCookie = (res) => {
     res.clearCookie(AUTH_COOKIE_NAME, options);
 };
 
+function redirectToLogin(req, res, message) {
+    req.flash('error', message);
+    if (!req.loginReturnTo) return res.redirect('/');
+    const returnTo = safeReturnPath(req.loginReturnTo, '/cart');
+    return res.redirect(`/?returnTo=${encodeURIComponent(returnTo)}`);
+}
+
 module.exports = async function isLoggedIn(req, res, next) {
     const token = req.cookies && req.cookies[AUTH_COOKIE_NAME];
     if (!token) {
-        req.flash('error', 'You need to log in first.');
-        return res.redirect('/');
+        return redirectToLogin(req, res, 'You need to log in first.');
     }
 
     let decoded;
@@ -28,14 +35,12 @@ module.exports = async function isLoggedIn(req, res, next) {
         });
     } catch (error) {
         clearAuthCookie(res);
-        req.flash('error', 'Your login has expired. Please log in again.');
-        return res.redirect('/');
+        return redirectToLogin(req, res, 'Your login has expired. Please log in again.');
     }
 
     if (!decoded.sub || !decoded.email) {
         clearAuthCookie(res);
-        req.flash('error', 'Please log in again.');
-        return res.redirect('/');
+        return redirectToLogin(req, res, 'Please log in again.');
     }
 
     try {
@@ -44,8 +49,7 @@ module.exports = async function isLoggedIn(req, res, next) {
             .select('-password');
         if (!user) {
             clearAuthCookie(res);
-            req.flash('error', 'Please log in again.');
-            return res.redirect('/');
+            return redirectToLogin(req, res, 'Please log in again.');
         }
 
         req.user = user;

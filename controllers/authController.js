@@ -5,6 +5,7 @@ const {
     AUTH_COOKIE_NAME,
     AUTH_COOKIE_OPTIONS,
 } = require('../config/keys');
+const safeReturnPath = require('../utils/safeReturnPath');
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordMinLength = 8;
@@ -17,6 +18,23 @@ function validEmail(value) {
 function authCookieClearOptions() {
     const { maxAge, ...options } = AUTH_COOKIE_OPTIONS;
     return options;
+}
+
+function logAuthFailure(operation, error) {
+    const details = { name: error && error.name ? error.name : 'Error' };
+    if (error && error.code !== undefined) details.code = error.code;
+
+    if (error && error.name === 'ValidationError') {
+        details.paths = Object.keys(error.errors || {});
+    } else if (error && /^Mongo/.test(error.name) && error.message) {
+        // Mongo messages help diagnose outages/configuration. Redact URI
+        // credentials; do not log arbitrary errors that may contain input.
+        details.message = String(error.message)
+            .replace(/(mongodb(?:\+srv)?:\/\/)[^\s@]+@/gi, '$1[redacted]@')
+            .slice(0, 400);
+    }
+
+    console.error(`[auth] ${operation} failed`, details);
 }
 
 module.exports.registerUser = async (req, res) => {
@@ -38,10 +56,17 @@ module.exports.registerUser = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 12);
         const user = await userModel.create({ fullName, email, password: hashedPassword });
         res.cookie(AUTH_COOKIE_NAME, generateToken(user), AUTH_COOKIE_OPTIONS);
-        return res.redirect('/shop');
+        return res.redirect(safeReturnPath(body.returnTo, '/shop'));
     } catch (error) {
         if (error.code === 11000) return res.status(409).send('Account already exists.');
-        if (error.name === 'ValidationError') return res.status(400).send('Please check your account details.');
+        if (error.name === 'ValidationError') {
+            logAuthFailure('registration validation', error);
+            const paths = Object.keys(error.errors || {});
+            return res.status(400).send(paths.length
+                ? `Please check these account fields: ${paths.join(', ')}.`
+                : 'Please check your account details.');
+        }
+        logAuthFailure('registration', error);
         return res.status(500).send('Unable to register this account.');
     }
 };
@@ -63,8 +88,9 @@ module.exports.loginUser = async (req, res) => {
         }
 
         res.cookie(AUTH_COOKIE_NAME, generateToken(user), AUTH_COOKIE_OPTIONS);
-        return res.redirect(user.role === 'owner' ? '/owners/admin' : '/shop');
+        return res.redirect(safeReturnPath(body.returnTo, user.role === 'owner' ? '/owners/admin' : '/shop'));
     } catch (error) {
+        logAuthFailure('login', error);
         return res.status(500).send('Unable to log in right now.');
     }
 };

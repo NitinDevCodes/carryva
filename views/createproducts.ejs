@@ -4,31 +4,99 @@
         <a class="mb-6 inline-block underline" href="/owners/admin">All products</a>
         <% success.forEach(function(message) { %><p class="mb-4 rounded bg-blue-100 p-3 text-blue-800"><%= message %></p><% }) %>
         <% if (error) { %><p class="mb-4 rounded bg-red-100 p-3 text-red-800"><%= error %></p><% } %>
-        <main class="rounded bg-white p-8 shadow">
+        <section class="rounded bg-white p-8 shadow">
             <h1 class="mb-6 text-xl font-bold"><%= product ? 'Edit product' : 'Create new product' %></h1>
             <form autocomplete="off" action="<%= product ? `/products/${product._id}/update` : '/products/create' %>" method="post" enctype="multipart/form-data">
-                <div class="mb-6">
-                    <h2 class="mb-2 font-semibold">Product details</h2>
-                    <label class="mb-2 block font-medium" for="image">Product image <%= product ? '(optional)' : '' %></label>
-                    <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp" class="mb-4 block py-2" <%= product ? '' : 'required' %>>
+                <section class="mb-8">
+                    <h2 class="mb-3 font-semibold">Product details</h2>
+                    <% if (product) { %>
+                        <p class="mb-2 text-sm text-zinc-600">Current gallery (<%= 1 + (product.images || []).length %> images)</p>
+                        <div class="mb-4 grid grid-cols-3 gap-3 sm:grid-cols-6">
+                            <img class="h-24 w-full rounded border object-contain" src="data:<%= product.imageContentType %>;base64,<%= product.image.toString('base64') %>" alt="Current primary product image">
+                            <% (product.images || []).forEach(function(image, index) { %>
+                                <img class="h-24 w-full rounded border object-contain" src="data:<%= image.contentType %>;base64,<%= image.data.toString('base64') %>" alt="Current product image <%= index + 2 %>">
+                            <% }) %>
+                        </div>
+                    <% } %>
+                    <label class="mb-1 block font-medium" for="images">Product images <%= product ? '(optional; selecting images replaces the gallery)' : '(select 1 to 6)' %></label>
+                    <input id="images" name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple <%= product ? '' : 'required' %> class="mb-4 block py-2">
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <input name="name" type="text" placeholder="Product Name" value="<%= product ? product.name : '' %>" minlength="2" maxlength="120" required class="w-full rounded border p-2">
-                        <input name="price" type="number" placeholder="Product Price" value="<%= product ? product.price : '' %>" min="0.01" max="10000000" step="0.01" required class="w-full rounded border p-2">
-                        <input name="discount" type="number" placeholder="Discount percent" value="<%= product ? product.discount : 0 %>" min="0" max="100" step="0.01" class="w-full rounded border p-2">
-                        <label class="flex items-center gap-2"><input name="isNewCollection" type="checkbox" <%= product && product.isNewCollection ? 'checked' : '' %>> New collection</label>
+                        <label class="block">Name
+                            <input name="name" type="text" value="<%= product ? product.name : '' %>" minlength="2" maxlength="120" required class="mt-1 w-full rounded border p-2">
+                        </label>
+                        <label class="block">Category
+                            <input name="category" type="text" value="<%= product ? (product.category || 'Other') : '' %>" minlength="2" maxlength="60" list="bag-categories" required class="mt-1 w-full rounded border p-2">
+                            <datalist id="bag-categories"><option value="Tote"><option value="Crossbody"><option value="Shoulder bag"><option value="Backpack"><option value="Clutch"><option value="Wallet"><option value="Travel bag"></datalist>
+                        </label>
+                        <label class="block sm:col-span-2">Description
+                            <textarea name="description" rows="4" maxlength="3000" class="mt-1 w-full rounded border p-2"><%= product ? (product.description || '') : '' %></textarea>
+                        </label>
+                        <label class="block">Regular price (₹)
+                            <input name="price" type="number" value="<%= product ? product.price : '' %>" min="0.01" max="10000000" step="0.01" required class="mt-1 w-full rounded border p-2">
+                        </label>
+                        <label class="block">Discounted price (₹, optional)
+                            <input name="discountedPrice" type="number" value="<%= product && product.discountedPrice != null ? product.discountedPrice : (product && product.discount > 0 ? (product.price * (1 - product.discount / 100)).toFixed(2) : '') %>" min="0.01" max="10000000" step="0.01" class="mt-1 w-full rounded border p-2">
+                        </label>
                     </div>
-                </div>
-                <div class="mb-6">
-                    <h2 class="mb-2 font-semibold">Panel colors</h2>
+                </section>
+                <section class="mb-8">
+                    <h2 class="mb-3 font-semibold">Materials and dimensions</h2>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <label class="block">Material
+                            <input name="material" type="text" value="<%= product ? (product.material || 'Not specified') : '' %>" minlength="2" maxlength="80" required class="mt-1 w-full rounded border p-2">
+                        </label>
+                        <label class="block">Colour
+                            <input name="colour" type="text" value="<%= product ? (product.colour || 'Not specified') : '' %>" minlength="2" maxlength="60" required class="mt-1 w-full rounded border p-2">
+                        </label>
+                        <label class="block">Dimensions (for example, 30 × 24 × 12 cm)
+                            <input name="dimensions" type="text" value="<%= product ? (product.dimensions || '') : '' %>" maxlength="80" class="mt-1 w-full rounded border p-2">
+                        </label>
+                        <label class="block">Capacity
+                            <input name="capacity" type="text" value="<%= product ? (product.capacity || '') : '' %>" maxlength="60" placeholder="For example, 12 L" class="mt-1 w-full rounded border p-2">
+                        </label>
+                        <label class="block">Weight (grams)
+                            <input name="weight" type="number" value="<%= product && product.weight != null ? product.weight : '' %>" min="0.01" max="50000" step="1" class="mt-1 w-full rounded border p-2">
+                        </label>
+                        <label class="block sm:col-span-2">Compartments and features (one per line)
+                            <textarea name="features" rows="4" class="mt-1 w-full rounded border p-2"><%= product ? (product.features || []).join('\n') : '' %></textarea>
+                        </label>
+                    </div>
+                </section>
+                <section class="mb-8">
+                    <h2 class="mb-3 font-semibold">Care and availability</h2>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <label class="block">Care instructions
+                            <textarea name="careInstructions" rows="3" maxlength="1200" class="mt-1 w-full rounded border p-2"><%= product ? (product.careInstructions || '') : '' %></textarea>
+                        </label>
+                        <label class="block">Warranty
+                            <textarea name="warranty" rows="3" maxlength="240" class="mt-1 w-full rounded border p-2"><%= product ? (product.warranty || '') : '' %></textarea>
+                        </label>
+                        <label class="block">Stock quantity
+                            <input name="stockQuantity" type="number" value="<%= product ? (product.stockQuantity ?? 1) : 1 %>" min="0" max="1000000" step="1" required class="mt-1 w-full rounded border p-2">
+                        </label>
+                        <label class="block">Availability
+                            <select name="availability" required class="mt-1 w-full rounded border p-2">
+                                <% const availability = product ? (product.availability || 'in-stock') : 'in-stock'; %>
+                                <option value="in-stock" <%= availability === 'in-stock' ? 'selected' : '' %>>In stock</option>
+                                <option value="out-of-stock" <%= availability === 'out-of-stock' ? 'selected' : '' %>>Out of stock</option>
+                                <option value="preorder" <%= availability === 'preorder' ? 'selected' : '' %>>Pre-order</option>
+                            </select>
+                        </label>
+                        <label class="flex items-center gap-2"><input name="isNewCollection" type="checkbox" <%= product && product.isNewCollection ? 'checked' : '' %>> New arrival</label>
+                        <label class="flex items-center gap-2"><input name="isFeatured" type="checkbox" <%= product && product.isFeatured ? 'checked' : '' %>> Feature on homepage</label>
+                    </div>
+                </section>
+                <section class="mb-8">
+                    <h2 class="mb-3 font-semibold">Card colours</h2>
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <input name="bgColor" type="text" placeholder="Background color (#f4f4f4)" value="<%= product ? product.bgColor : '#f4f4f4' %>" pattern="(#[0-9a-fA-F]{3,8}|[a-zA-Z]{1,24})" required class="w-full rounded border p-2">
-                        <input name="panelColor" type="text" placeholder="Panel color (#ffffff)" value="<%= product ? product.panelColor : '#ffffff' %>" pattern="(#[0-9a-fA-F]{3,8}|[a-zA-Z]{1,24})" required class="w-full rounded border p-2">
-                        <input name="textColor" type="text" placeholder="Text color (#111827)" value="<%= product ? product.textColor : '#111827' %>" pattern="(#[0-9a-fA-F]{3,8}|[a-zA-Z]{1,24})" required class="w-full rounded border p-2">
+                        <label class="block">Background<input name="bgColor" type="text" value="<%= product ? product.bgColor : '#f4f4f4' %>" pattern="(#[0-9a-fA-F]{3,8}|[a-zA-Z]{1,24})" required class="mt-1 w-full rounded border p-2"></label>
+                        <label class="block">Panel<input name="panelColor" type="text" value="<%= product ? product.panelColor : '#ffffff' %>" pattern="(#[0-9a-fA-F]{3,8}|[a-zA-Z]{1,24})" required class="mt-1 w-full rounded border p-2"></label>
+                        <label class="block">Text<input name="textColor" type="text" value="<%= product ? product.textColor : '#111827' %>" pattern="(#[0-9a-fA-F]{3,8}|[a-zA-Z]{1,24})" required class="mt-1 w-full rounded border p-2"></label>
                     </div>
-                </div>
+                </section>
                 <button class="rounded bg-blue-500 px-5 py-2 text-white" type="submit"><%= product ? 'Save changes' : 'Create product' %></button>
             </form>
-        </main>
+        </section>
     </div>
 </main>
 <%- include('./partials/footer') %>

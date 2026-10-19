@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const Product = require('../models/product-model');
 
 const maxImagePixels = 40000000;
+const maxProductImages = 6;
+const maxProductImageBytes = 20 * 1024 * 1024;
 
 function dimensionsAreSafe(width, height) {
     return width > 0 && height > 0 && width <= 12000 && height <= 12000 && width * height <= maxImagePixels;
@@ -68,34 +70,105 @@ function hasValidImage(file) {
     return Boolean(file && file.buffer && imageValidators[file.mimetype]?.(file.buffer));
 }
 
-function productInput(body, file, existing) {
+function productImages(req) {
+    return [...(req.files?.images || []), ...(req.files?.image || [])];
+}
+
+function productInput(body, files, existing) {
     const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const description = typeof body.description === 'string' ? body.description.trim() : '';
     const price = body.price === '' || body.price === undefined ? NaN : Number(body.price);
-    const discount = body.discount === '' || body.discount === undefined ? 0 : Number(body.discount);
+    const hasDiscountedPrice = Object.hasOwn(body, 'discountedPrice');
+    const requestedDiscountedPrice = body.discountedPrice === '' || body.discountedPrice === undefined
+        ? undefined
+        : Number(body.discountedPrice);
+    const requestedDiscount = body.discount === '' || body.discount === undefined ? 0 : Number(body.discount);
+    let discount = requestedDiscount;
+    let discountedPrice;
+    if (hasDiscountedPrice) {
+        if (requestedDiscountedPrice === undefined) {
+            discount = 0;
+        } else {
+            if (!Number.isFinite(requestedDiscountedPrice) || requestedDiscountedPrice < 0.01 || requestedDiscountedPrice >= price) {
+                return { error: 'Discounted price must be greater than zero and lower than the regular price.' };
+            }
+            discountedPrice = requestedDiscountedPrice;
+            discount = Math.min(99.99, Math.round((1 - discountedPrice / price) * 10000) / 100);
+        }
+    } else if (Number.isFinite(price) && Number.isFinite(requestedDiscount) && requestedDiscount > 0) {
+        discountedPrice = Math.round(price * (1 - requestedDiscount / 100) * 100) / 100;
+    }
     const bgColor = typeof (body.bgColor ?? body.bgcolor) === 'string' ? (body.bgColor ?? body.bgcolor).trim() : '';
     const panelColor = typeof (body.panelColor ?? body.panelcolor) === 'string' ? (body.panelColor ?? body.panelcolor).trim() : '';
     const textColor = typeof (body.textColor ?? body.textcolor) === 'string' ? (body.textColor ?? body.textcolor).trim() : '';
     const colorPattern = /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{1,24})$/;
 
     if (name.length < 2 || name.length > 120) return { error: 'Product name must be 2 to 120 characters.' };
+    if (description.length > 3000) return { error: 'Description must be 3000 characters or fewer.' };
     if (!Number.isFinite(price) || price < 0.01 || price > 10000000) return { error: 'Enter a valid price greater than zero.' };
-    if (!Number.isFinite(discount) || discount < 0 || discount > 100) return { error: 'Discount must be between 0 and 100 percent.' };
+    if (!Number.isFinite(discount) || discount < 0 || discount >= 100) return { error: 'Discount must be at least 0 and less than 100 percent.' };
+    if (discountedPrice !== undefined && discountedPrice < 0.01) return { error: 'The discounted price must be at least ₹0.01.' };
     if (![bgColor, panelColor, textColor].every((color) => colorPattern.test(color))) {
         return { error: 'Use a simple color name or a hexadecimal color value.' };
     }
-    if (file && !hasValidImage(file)) return { error: 'The uploaded file does not match a supported image type.' };
-    if (!file && !existing) return { error: 'Please select a JPEG, PNG, or WebP product image.' };
+    const category = typeof body.category === 'string' ? body.category.trim() : '';
+    const material = typeof body.material === 'string' ? body.material.trim() : '';
+    const colour = typeof body.colour === 'string' ? body.colour.trim() : '';
+    const dimensions = typeof body.dimensions === 'string' ? body.dimensions.trim() : '';
+    const capacity = typeof body.capacity === 'string' ? body.capacity.trim() : '';
+    const weight = body.weight === '' || body.weight === undefined ? undefined : Number(body.weight);
+    const stockQuantity = body.stockQuantity === '' || body.stockQuantity === undefined ? NaN : Number(body.stockQuantity);
+    const availability = typeof body.availability === 'string' ? body.availability : '';
+    const careInstructions = typeof body.careInstructions === 'string' ? body.careInstructions.trim() : '';
+    const warranty = typeof body.warranty === 'string' ? body.warranty.trim() : '';
+    const rawFeatures = typeof body.features === 'string' ? body.features : '';
+    const features = rawFeatures.split(/[\n,]/).map((feature) => feature.trim()).filter(Boolean);
+
+    if (category.length < 2 || category.length > 60) return { error: 'Enter a product category between 2 and 60 characters.' };
+    if (material.length < 2 || material.length > 80) return { error: 'Enter a material between 2 and 80 characters.' };
+    if (colour.length < 2 || colour.length > 60) return { error: 'Enter a colour between 2 and 60 characters.' };
+    if (dimensions.length > 80 || capacity.length > 60) return { error: 'Check the dimensions and capacity fields.' };
+    if (weight !== undefined && (!Number.isFinite(weight) || weight <= 0 || weight > 50000)) return { error: 'Weight must be between 0 and 50000 grams.' };
+    if (!Number.isInteger(stockQuantity) || stockQuantity < 0 || stockQuantity > 1000000) return { error: 'Stock quantity must be a whole number from 0 to 1000000.' };
+    if (!['in-stock', 'out-of-stock', 'preorder'].includes(availability)) return { error: 'Choose a valid availability status.' };
+    if (availability === 'in-stock' && stockQuantity === 0) return { error: 'Set stock above zero or choose another availability status.' };
+    if (careInstructions.length > 1200 || warranty.length > 240) return { error: 'Care instructions or warranty text is too long.' };
+    if (features.length > 20 || features.some((feature) => feature.length < 2 || feature.length > 120)) return { error: 'Add up to 20 features, each no longer than 120 characters.' };
+    if (files.length > maxProductImages) return { error: `Upload no more than ${maxProductImages} product images.` };
+    if (files.some((file) => !hasValidImage(file))) return { error: 'An uploaded file does not match a supported image type.' };
+    if (files.reduce((sum, file) => sum + file.size, 0) > maxProductImageBytes) return { error: 'Product images must total 20 MB or less.' };
+    if (!files.length && !existing) return { error: 'Please select at least one JPEG, PNG, or WebP product image.' };
+
+    const imageUpdates = files.length ? {
+        image: files[0].buffer,
+        imageContentType: files[0].mimetype,
+        images: files.slice(1).map((file) => ({ data: file.buffer, contentType: file.mimetype })),
+    } : {};
 
     return {
         value: {
             name,
+            description,
             price,
             discount,
+            discountedPrice,
+            category,
+            material,
+            colour,
+            dimensions,
+            capacity,
+            weight,
+            features,
+            careInstructions,
+            warranty,
+            stockQuantity,
+            availability,
             bgColor,
             panelColor,
             textColor,
             isNewCollection: ['on', 'true', '1'].includes(String(body.isNewCollection || '').toLowerCase()),
-            ...(file ? { image: file.buffer, imageContentType: file.mimetype } : {}),
+            isFeatured: ['on', 'true', '1'].includes(String(body.isFeatured || '').toLowerCase()),
+            ...imageUpdates,
         },
     };
 }
@@ -172,7 +245,7 @@ module.exports.showEditForm = async (req, res) => {
 };
 
 module.exports.createProduct = async (req, res) => {
-    const input = productInput(req.body || {}, req.file, null);
+    const input = productInput(req.body || {}, productImages(req), null);
     if (input.error) return res.status(400).send(input.error);
     try {
         await Product.create(input.value);
@@ -189,7 +262,7 @@ module.exports.updateProduct = async (req, res) => {
     try {
         const existing = await Product.findById(req.params.id);
         if (!existing) return notFoundProduct(res);
-        const input = productInput(req.body || {}, req.file, existing);
+        const input = productInput(req.body || {}, productImages(req), existing);
         if (input.error) return res.status(400).send(input.error);
 
         Object.assign(existing, input.value);

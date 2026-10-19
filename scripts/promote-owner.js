@@ -20,7 +20,7 @@ async function main() {
     if (!email) throw new Error('Usage: npm run owner:promote -- user@example.com');
     const development = require('../config/development.json');
     await mongoose.connect(process.env.MONGODB_URI || development.MONG_URI, {
-        dbName: process.env.MONGODB_DB || 'carryva',
+        dbName: process.env.MONGODB_DB || 'Carryva',
     });
 
     await promoteOwner(email);

@@ -10,6 +10,25 @@
 </head>
 
 <body class="font-['helvetica_now_display']">
-    <nav class="w-full fixed top-0 left-0 px-5 py-3">
+    <nav class="w-full fixed top-0 left-0 z-20 flex items-center justify-between bg-white/90 px-5 py-3 backdrop-blur">
         <h3 class="text-xl">Carryva</h3>
+        <div class="flex items-center gap-3">
+        <a class="rounded-full px-3 py-2 text-sm underline" href="/orders">Orders</a>
+        <a class="flex items-center gap-2 rounded-full border px-4 py-2 text-sm" href="/cart" aria-label="Shopping cart">
+            <i class="ri-shopping-bag-line" aria-hidden="true"></i>
+            <span>Cart</span>
+            <span id="cart-count" class="flex h-5 min-w-5 items-center justify-center rounded-full bg-zinc-900 px-1 text-xs text-white" aria-live="polite">0</span>
+        </a>
+        </div>
     </nav>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('/cart/count', { headers: { Accept: 'application/json' } })
+                .then((response) => response.ok && !response.redirected ? response.json() : null)
+                .then((result) => {
+                    const count = document.getElementById('cart-count');
+                    if (count && result && Number.isInteger(result.count)) count.textContent = String(result.count);
+                })
+                .catch(() => {});
+        });
+    </script>

@@ -20,7 +20,8 @@ Carryva is an Express and EJS application backed by MongoDB through Mongoose.
    ```
 
    `MONGODB_URI` may be omitted to use `config/development.json`. The app
-   connects to the `carryva` database on that MongoDB server.
+   connects to the `Carryva` database on that MongoDB server. Set
+   `MONGODB_DB` explicitly when your database uses a different name.
 3. Start the server with `npm start` and open <http://localhost:3000>.
 
 For development with automatic restarts, run `npm run dev`.

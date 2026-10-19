@@ -8,6 +8,8 @@ const indexRouter = require('./routes/index');
 const ownersRouter = require('./routes/ownersRouter');
 const usersRouter = require('./routes/usersRouter');
 const productsRouter = require('./routes/productsRouter');
+const cartRouter = require('./routes/cartRouter');
+const ordersRouter = require('./routes/ordersRouter');
 const session = require('express-session');
 const flash = require('connect-flash');
 const { SESSION_SECRET } = require('./config/keys');
@@ -39,6 +41,8 @@ app.set('views', path.join(__dirname, 'views'));
 app.use('/', indexRouter);
 app.use('/owners', ownersRouter);
 app.use('/users', usersRouter);
+app.use('/cart', cartRouter);
+app.use('/', ordersRouter);
 app.use('/products', productsRouter);
 
 const port = Number(process.env.PORT) || 3000;

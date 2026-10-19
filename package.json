@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node app.js",
     "dev": "node --watch app.js",
-    "test": "node test/auth.test.js && node test/products.test.js",
+    "test": "node test/auth.test.js && node test/products.test.js && node test/cart.test.js && node test/orders.test.js",
     "owner:promote": "node scripts/promote-owner.js"
   },
   "keywords": [],

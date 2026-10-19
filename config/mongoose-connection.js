@@ -16,7 +16,11 @@ function getMongoUri() {
 }
 
 mongoose
-    .connect(getMongoUri(), { dbName: process.env.MONGODB_DB || 'carryva' })
+    // The existing Windows MongoDB database was created as `Carryva`. MongoDB
+    // treats database names case-insensitively on Windows and rejects creating
+    // `carryva` beside it with server error 13297. Keep an explicit override
+    // available for other environments, and match the existing local DB.
+    .connect(getMongoUri(), { dbName: process.env.MONGODB_DB || 'Carryva' })
     .then(() => {
         dbgr('Connected to MongoDB');
     })
