@@ -1,11 +1,31 @@
-# Carryva
+ <div align="center">
 
-**Carryva** is a premium bags e-commerce web application built with **Node.js, Express, EJS, and MongoDB**. It was developed as a full-stack portfolio project to demonstrate product catalog management, authentication, persistent shopping carts, and order processing.
+# <em> C a r r y v a </em>
+
+**A premium handbag shopping experience.**
+
+A full-stack e-commerce portfolio project built for modern bag shopping.
+
+<br>
+
+<img src="https://img.shields.io/badge/NODE.JS-38BDF8?style=for-the-badge&logo=nodedotjs&logoColor=black" alt="Node.js">
+<img src="https://img.shields.io/badge/EXPRESS-38BDF8?style=for-the-badge&logo=express&logoColor=black" alt="Express">
+<img src="https://img.shields.io/badge/MONGODB-38BDF8?style=for-the-badge&logo=mongodb&logoColor=black" alt="MongoDB">
+<img src="https://img.shields.io/badge/EJS-38BDF8?style=for-the-badge&logo=ejs&logoColor=black" alt="EJS">
+
+</div>
+
+---
+
+
 
 ## Screenshots
 
 ### Homepage
 ![Carryva Homepage](docs/screenshots/homepage.png)
+
+### Shop
+![Shop Page](docs/screenshots/shop.png)
 
 ### Product Details
 ![Product Details](docs/screenshots/product-details.png)
@@ -13,13 +33,10 @@
 ### Shopping Cart
 ![Shopping Cart](docs/screenshots/cart.png)
 
-### Shop
-![Shop Page](docs/screenshots/shop.png)
-
 ## Features
 
-- **Product Catalog:** Browse bags, view product details, and explore featured products.
-- **Authentication:** Customer login, registration, and session management.
+- **Product Catalog:** Browse bags, explore featured products, and view detailed product information.
+- **Authentication:** Customer registration, login, and session management.
 - **Cart Management:** Persistent carts with server-side price and stock validation.
 - **Checkout & Orders:** Cash-on-delivery checkout, order history, and order management.
 - **Owner Dashboard:** Manage products and update order fulfilment status.
@@ -37,45 +54,49 @@
 
 ## Local Setup
 
-**Requirements:** Node.js 20+ and MongoDB running as a replica set.
+**Requirements:** Node.js 20+ and MongoDB configured as a replica set.
 
-1. Clone the repository:
+**1. Clone the repository**
 
-   ```bash
-   git clone https://github.com/NitinDevCodes/carryva.git
-   cd carryva
-   ```
+```bash
+git clone https://github.com/NitinDevCodes/carryva.git
+cd carryva
+```
 
-2. Install dependencies:
+**2. Install dependencies**
 
-   ```bash
-   npm ci
-   ```
+```bash
+npm ci
+```
 
-3. Copy `.env.example` to `.env` and configure the required environment variables:
+**3. Configure environment variables**
 
-   ```env
-   PORT=3000
-   NODE_ENV=development
-   MONGODB_URI=mongodb://127.0.0.1:27017/?replicaSet=carryva-rs
-   MONGODB_DB=Carryva
-   JWT_KEY=your_random_secret
-   EXPRESS_SESSION_SECRET=your_other_random_secret
-   ```
+Copy `.env.example` to `.env` and configure:
 
-   Generate two distinct random secrets of at least 32 bytes. Configure MongoDB as a replica set before using transactional checkout and cancellation.
+```env
+PORT=3000
+NODE_ENV=development
+MONGODB_URI=mongodb://127.0.0.1:27017/?replicaSet=carryva-rs
+MONGODB_DB=Carryva
+JWT_KEY=your_random_secret
+EXPRESS_SESSION_SECRET=your_other_random_secret
+```
 
-4. Start the application:
+Generate two distinct random secrets of at least 32 bytes. Keep `.env` private and never commit real credentials.
 
-   ```bash
-   npm start
-   ```
+Configure and initialize your local MongoDB replica set before using transactional checkout and cancellation.
 
-5. Open [http://localhost:3000](http://localhost:3000).
+**4. Start the application**
+
+```bash
+npm start
+```
+
+Open [http://localhost:3000](http://localhost:3000).
 
 ## Testing
 
-Run the test suite with:
+Run the test suite:
 
 ```bash
 npm test
@@ -85,19 +106,27 @@ Transaction tests require a disposable MongoDB replica set. Configure `CARRYVA_T
 
 ## Deployment
 
-The application is configured for production deployment with MongoDB Atlas.
+Carryva is configured for production deployment with MongoDB Atlas.
 
-Set `NODE_ENV`, `MONGODB_URI`, `MONGODB_DB`, `JWT_KEY`, and `EXPRESS_SESSION_SECRET` in your hosting provider's environment settings. Use HTTPS and configure trusted proxy settings when required.
+Configure the following environment variables in your hosting provider:
 
-Health endpoints:
+- `NODE_ENV`
+- `MONGODB_URI`
+- `MONGODB_DB`
+- `JWT_KEY`
+- `EXPRESS_SESSION_SECRET`
+
+Use HTTPS, secure database credentials, and appropriate trusted proxy settings.
+
+**Health endpoints**
 
 - `/health/live` — application liveness.
 - `/health/ready` — database readiness and transaction support.
 
 ## Project Status
 
-A portfolio project built to explore full-stack e-commerce development, database transactions, authentication, and deployment practices. Some features may require further refinement.
+A portfolio project demonstrating full-stack e-commerce development, authentication, database transactions, cart management, and deployment practices. Further refinements may be needed.
 
 ## License
 
-This project is available for educational and portfolio purposes.
+Available for educational and portfolio purposes.
